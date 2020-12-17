@@ -1,0 +1,62 @@
+{
+    "BRA" : {
+        "id" : 2013,
+        "emblemURL" : null,
+        "name" : "Série A"   
+    },
+
+    "PL" : {
+        "id" : 2021,
+        "emblemURL" : "https://upload.wikimedia.org/wikipedia/en/a/ae/Flag_of_the_United_Kingdom.svg",
+        "name" : "Premier League"
+    },
+
+    "CL" : {
+        "id": 2001,
+        "emblemURL" : "https://upload.wikimedia.org/wikipedia/en/b/bf/UEFA_Champions_League_logo_2.svg",
+        "name" : "Champions League"
+    },
+
+    "FRA" : {
+        "id" : 2015,
+        "emblemURL" : null,
+        "name" : "Ligue 1"
+    },
+
+    "BL" : {
+        "id" : 2002,
+        "emblemURL" : null,
+        "name" : "Bundesliga"
+    },
+
+    "SA" : {
+        "id" : 2019,
+        "emblemURL" : "https://crests.football-data.org/SA.svg",
+        "name" : "Serie A"
+    },
+
+    "LP" : {
+        "id" : 2017,
+        "emblemURL" : "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Liga_NOS_logo.png/150px-Liga_NOS_logo.png",
+        "name" : "Liga Portuguesa",
+        "url" : "https://www.flashscore.com/football/portugal/primeira-liga"
+    },
+
+    "LE" : {
+        "id" : 2014,
+        "emblemURL" : null,
+        "name" : "Liga Espanhola"
+    },
+
+    "WC" : {
+        "id" : 2000,
+        "emblemURL" : null,
+        "name" : "World Cup"
+    },
+
+    "EUR" : {
+        "id" : 2018,
+        "emblemURL" : null,
+        "name" : "Euro"
+    }
+}
