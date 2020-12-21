@@ -17,6 +17,12 @@ async def database_exists(ctx):
 
 async def is_comp(ctx):
         database = pymongo.MongoClient(port= 27017)
-        if ctx.message.content.split()[1] not in database["totobola"].list_collection_names(): return False
+        if ctx.message.content.split()[1] in database["totobola"].list_collection_names(): return False
         
         return True
+
+async def is_comp_not(ctx):
+        database = pymongo.MongoClient(port= 27017)
+        if ctx.message.content.split()[1] in database["totobola"].list_collection_names(): return True
+        
+        return False

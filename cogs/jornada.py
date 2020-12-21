@@ -5,194 +5,24 @@ import os
 import pymongo
 import json
 import sys
-import requests
 import re
+import asyncio
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
 sys.path.append(f"{PATH}/utils/")
 
 from utils import is_admin
+from api import check_games, get_h2h, get_jornada, get_num_jornada
 
 class Jornada(commands.Cog):
 
     def __init__(self, client):
         self.client = client
-
-    @commands.Cog.listener()
-    async def on_reaction_add( self, reaction: discord.Reaction, user: discord.User ):
-        database = pymongo.MongoClient(port = 27017)
-        
-        if user.bot:
-            return
-        
-        if reaction.message.guild is not None:
-            return
-
-        if database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA"}) == 0:
-            await user.send(":pencil2: Não existem jornadas ativas!")
-            return
-
-        jornadas = database["totobola"]["jornadas"].find({"estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
-        
-        if jornadas.count() == 0: return
-        
-        jornada_ativa = False
-        j = None
-        a = None
-
-        for jornada in jornadas:
-            aposta = database["totobola"][jornada["id_jornada"]].find_one({"player_id" : user.id}, {"_id" : 0, "message_id" : 1, "status" : 1, "current" : 1})
-            
-            if aposta["message_id"] == reaction.message.id:
-                j = jornada
-                a = aposta
-            
-            if aposta["status"] == "ATIVA":
-                jornada_ativa = True
-        
-        del jornada
-        del aposta
-        
-        if jornada_ativa:
-            await user.send(":lock: Já tens uma jornada ativa! Termina a tua aposta...")
-            return
-        
-        position = database["totobola"]["jornadas"].aggregate( [ { "$match" : {"id_jornada" : j["id_jornada"]}}, 
-                                                                { "$project" : { "index" : { "$indexOfArray" : ["$jogos.id_jogo", a["current"]]} } }])
-            
-        try:
-            position = position.next()
-            
-            while j["jogos"][position["index"]]["estado"] != "SCHEDULED" and position["index"] < len(j["jogos"]) - 1:
-                position["index"] += 1
-
-            await user.send(f":soccer: {j['jogos'][position['index']]['id_jogo']}: {j['jogos'][position['index']]['homeTeam']} - {j['jogos'][position['index']]['awayTeam']}")
-            
-            database["totobola"][j["id_jornada"]].update({"player_id" : user.id}, {"$set" : {"current" : j["jogos"][position["index"]]['id_jogo'], "status" : "ATIVA"}})
+        self.task = None
     
-        except StopIteration:
-            print("[Jornada - Erro] Posição não encontrada!")
-    
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        # TODO: Verificar se message.author.id tem uma aposta ativa -> DONE
-        #print(message.guild is None and not message.author.bot)
-        if message.author == self.client.user: 
-            return
-        
-        elif message.guild is None:
-            database = pymongo.MongoClient(port = 27017)
-
-            if database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA"}) == 0:
-                await message.author.send(":pencil2: Não existem jornadas ativas!")
-                return
-
-            jornadas = database["totobola"]["jornadas"].find({"estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
-            
-            bet = None
-
-            for jornada in jornadas:
-                aposta = database["totobola"][jornada["id_jornada"]].find_one({"player_id" : message.author.id}, {"_id" : 0, "message_id" : 1, "status" : 1, "current" : 1, "joker" : 1})
-
-                if aposta["status"] == "ATIVA":
-                    bet = aposta
-                    break
-
-            del aposta
-
-            if bet is None:
-                await message.author.send(":pencil2: Tens que ativar a jornada antes de apostares!")
-                return
-
-            position = database["totobola"]["jornadas"].aggregate( [ { "$match" : {"id_jornada" : jornada["id_jornada"]}}, 
-                                                            { "$project" : { "index" : { "$indexOfArray" : ["$jogos.id_jogo", bet["current"]]} } }])
-
-            try:
-                position = position.next()
-                
-                blocked = False
-
-                while jornada["jogos"][position["index"]]["estado"] != "SCHEDULED" and position["index"] < len(jornada["jogos"]) - 1:
-                    blocked = True
-                    position["index"] += 1
-
-                if blocked:
-                    await message.author.send(":lock: O jogo em que tentaste apostar já não se encontra ativo!")
-                    database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id} , { "$set" : {"current" : jornada["jogos"][position["index"]]["id_jogo"]}})
-                    message = await message.author.send(f":soccer: {jornada['jogos'][position['index']]['id_jogo']}: {jornada['jogos'][position['index']]['homeTeam']} - {jornada['jogos'][position['index']]['awayTeam']}")
-                    return
-
-                if len(re.findall(r"\s*(x)\s*-\s*(x)\s*", message.content.lower())) > 0:        # x-x : Não quer apostar
-                    position["index"] += 1
-                
-                    if position["index"] > len(jornada["jogos"]) - 1: 
-                        database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id}, {"$set" : {"status" : "TERMINADA"}})
-
-                    else: 
-                        database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id}, {"$set" : {"current" : jornada["jogos"][position["index"]]["id_jogo"]}})
-                
-                elif len(re.findall(r'\d+', message.content.lower())) == 2:                     # 2-2 : Aposta válida
-                    #position["index"] += 1
-                    joker = bet["joker"]
-
-                    if "*" in message.content.lower(): joker = jornada["jogos"][position["index"]]["id_jogo"]                                        # Joker
-
-                    res = re.findall(r'\d+', message.content.lower())
-                    
-                    tendencia = None
-
-                    if int(res[0]) > int(res[1]) : tendencia = "homeWin"
-                    elif int(res[0]) == int(res[1]) : tendencia = "draw"
-                    elif int(res[0]) < int(res[1]) : tendencia = "awayWin"
-                    
-                    result = res
-                    res = f"{res[0]}-{res[1]}"
-
-                    if position["index"] == len(jornada["jogos"]) - 1:
-                        database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id, "apostas.id_jogo" : jornada["jogos"][position["index"]]["id_jogo"]},
-                                                                                {"$set" : {"status" : "TERMINADA", "apostas.$.tendencia" : tendencia, "joker" : joker, "apostas.$.resultado" : res}})
-                    
-                        await message.author.send(f":soccer: {jornada['jogos'][position['index']]['id_jogo']}: {jornada['jogos'][position['index']]['homeTeam']} {result[0]}-{result[1]} {jornada['jogos'][position['index']]['awayTeam']}")
-                        await message.author.send(":fireworks: Aposta terminada!")
-
-                    else:
-                        database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id, "apostas.id_jogo" : jornada["jogos"][position["index"]]["id_jogo"]},
-                                                                                {"$set" : {"current" : jornada["jogos"][position["index"] + 1]["id_jogo"], "apostas.$.tendencia" : tendencia, "joker" : joker, "apostas.$.resultado" : res}})
-
-                        await message.author.send(f":soccer: {jornada['jogos'][position['index']]['id_jogo']}: {jornada['jogos'][position['index']]['homeTeam']} {result[0]}-{result[1]} {jornada['jogos'][position['index']]['awayTeam']}")
-                        await message.author.send(f":soccer: {jornada['jogos'][position['index'] + 1]['id_jogo']}: {jornada['jogos'][position['index'] + 1]['homeTeam']} - {jornada['jogos'][position['index'] + 1]['awayTeam']}")                        
-                else:
-                    await message.author.send(":x: Resultado inválido!")
-                    return
-
-            except StopIteration:
-                pass
-        
-        else:
-            return
-
-        
-        # TODO: Verificar se o jogo atual ainda permanece "SCHEDULED" -> DONE
-        
-        # TODO: Verificar se a aposta está correta -> DONE
-        
-        # TODO: Verificar se utilizou JOKER -> DONE
-
-        # TODO: Calcular tendência do resultado (winHome - draw - winAway) -> DONE
-        
-        # TODO: Guardar a aposta -> DONE
-
-        # TODO: Atualizar o jogo atual -> DONE
-
-        # TODO: Se for o último jogo, terminar aposta -> DONE
-
-        # TODO: Melhorar mensagem 
-        
-        # TODO: Add cos
-
     @commands.command()
     @commands.check( is_admin )
-    async def jornada( self, ctx, comp: str, num: int, *jogos: str):
+    async def jornada( self, ctx, comp: str, *jogos: str):
         database = pymongo.MongoClient(port = 27017)
         competicoes = None
         competicoes = database["totobola"]["properties"].find_one({"competicoes.competicao" : comp})
@@ -211,37 +41,37 @@ class Jornada(commands.Cog):
             for competicao in competicoes["competicoes"]:
                 if competicao["competicao"] == comp and competicao["link"] is not None:
                     
+                    num = get_num_jornada(competicao["link"])
+
                     jornada = {
                         "id_jornada"    : jornada_id,
                         "num_jornada"   : int(num),
                         "competicao"    : comp,
+                        "link"          : competicao["link"],
                         "estado"        : "ATIVA",
                         "jogos"         : []
                     }
 
-                    with open(f"{PATH}/api-token.txt", "rb") as token:
-                        token = token.readline()
+                    request = get_jornada(competicao["link"], num)
                     
-                    print(competicao)
-
-                    request = requests.get(f"http://api.football-data.org/v2/competitions/{competicao['link']}/matches",
-                                            params = {"matchday" : num, "status" : "SCHEDULED"},
-                                            headers = {"X-Auth-Token" : token})
-                    
-                    request = request.json()
-
                     if len(request["matches"]) == 0:
-                        await ctx.send("Não encontrei jogos!")
+                        await ctx.send("Não encontrei jogos! Tenta outra jornada...")
                         return
 
+                    await ctx.send(":clock1: A recolha dos jogos vai demorar um bocado... Obrigado!")
                     for match in request["matches"]:
+                        
+                        h2h_home, h2h_away = await get_h2h(match)
+
                         jornada["jogos"].append({
                             "id_jogo" : match["id"],
-                            "estado"  : "SCHEDULED",
+                            "estado"  : "SCHEDULED",                # SCHEDULED - LIVE - STATIC - PROCESSED
                             "resultado" : None,
                             "tendencia" : None,
                             "homeTeam"  : match["homeTeam"]["name"],
-                            "awayTeam"  : match["awayTeam"]["name"]
+                            "awayTeam"  : match["awayTeam"]["name"],
+                            "h2hHome" : h2h_home,
+                            "h2hAway" : h2h_away
                         })
                     
                     database["totobola"]["jornadas"].insert_one(jornada)
@@ -252,7 +82,7 @@ class Jornada(commands.Cog):
                         "status" : "INATIVA",
                         "current" : jornada["jogos"][0]["id_jogo"],
                         "pontuacao" : 0,
-                        "joker" : None,
+                        "joker" : {"id_jogo": None, "processed" : 0},
                         "apostas" : [{"id_jogo" : jogo["id_jogo"], "resultado" : None, "tendencia" : None} for jogo in jornada["jogos"]]
                     }
                     
@@ -260,18 +90,108 @@ class Jornada(commands.Cog):
                         user = await self.client.fetch_user(_user["player_id"])
                         jogador["player_id"] = _user["player_id"] 
                         
-                        message = await user.send(f":on: Jornada {jornada['num_jornada']} : {jornada['competicao']} ativa")
+                        message = await user.send(f":hourglass: Jornada {jornada['num_jornada']} : {jornada['competicao']} ativa")
                         await message.add_reaction("📄")
                         await message.pin()
 
                         jogador["message_id"] = message.id 
                         database["totobola"][jornada["id_jornada"]].insert_one(jogador)
                 
-                else:
-                    print("Verificar os jogos!")
+                elif (competicao["competicao"] == comp and competicao["link"] is None) and len(jogos) == 0:
+                    print(":link: Esta competição não está conectada a nenhuma liga. Utiliza **td!get [ligas]** para ver os jogos disponíveis das ligas indicadas!")
         
         else:
             await ctx.send(":octagonal_sign: A competição indicada não existe!")
+
+    @commands.command()
+    @commands.check( is_admin )
+    async def load(self, ctx):
+        print("load")
+        self.task = self.client.loop.create_task(check_games())
+    
+    @commands.command()
+    @commands.check( is_admin )
+    async def unload(self, ctx):
+        print("unload")
+        self.task.cancel()
+        self.task = None
+
+    @commands.command()
+    @commands.check( is_admin )
+    async def get(self, ctx, *ligas):
+        with open(f"{PATH}/football/leagues.json", "r") as leagues:
+            leagues = json.load(leagues)
+        
+        ids = []
+        names = []
+        msg = ""
+
+        for liga in ligas:
+            if liga.upper() not in leagues:
+                await ctx.send(f":x: O código {liga} está incorreto! Verifica o comando **td!ligas** para saber mais...")
+                return
+            
+            ids.append(leagues[liga.upper()]["id"])
+            names.append(leagues[liga.upper()]["name"])
+            msg += f":soccer: `{leagues[liga.upper()]['id']}` - **{leagues[liga.upper()]['name']}**\n"
+
+        await ctx.send(f"Ligas encontradas:\n{msg}\n\n:timer: A procurar informação dessas ligas...")
+    
+        n_jornadas = []
+        info_ligas = {}
+
+        for n, _id in enumerate(ids):
+            jogos = []
+            
+            n_jornadas.append(get_num_jornada(_id))
+            await asyncio.sleep(10)
+            jornada = get_jornada(_id, n_jornadas[n])
+
+            for jogo in enumerate(jornada["matches"]):
+                jogos.append({
+                    "id_jogo" : jogo["id"],
+                    "homeTeam" : {
+                        "id" : jogo["homeTeam"]["id"],
+                        "name" : jogo["homeTeam"]["name"]},
+                    "awayTeam" : {
+                        "id" : jogo["awayTeam"]["id"],
+                        "name" : jogo["awayTeam"]["name"]}
+                })
+            
+            info_ligas[ligas[n].upper()] = {
+                    "name" : names[n],
+                    "id" : _id,
+                    "num" : n_jornadas[n],
+                    "jogos" : jogos
+            }
+
+        with open(f"{PATH}/temp/jornada.json", "w") as info:
+            json.dump(info_ligas, info)
+
+        await ctx.send(":point_right: Informação recolhida. Podes aceder aos jogos através de **td!games [liga]**!")
+
+    @commands.command()
+    @commands.check(is_admin)
+    async def games(self, ctx, liga: str):
+        if not os.path.isfile(f"{PATH}/temp/jornada.json"):
+            await ctx.send(":x: Não foram recolhidos nenhuns jogos!")
+            return
+        
+        with open(f"{PATH}/temp/jornada.json", "r") as info_ligas:
+            info_ligas = json.load(info_ligas)
+
+        if liga.upper() not in info_ligas:
+            await ctx.send(":x: Não foram recolhidos nenhuns jogos dessa competição!")
+            return
+        
+        jogos = '\n'.join([f':soccer: `{jogo["id_jogo"]}`: {jogo["homeTeam"]["name"]} - {jogo["awayTeam"]["name"]}' for jogo in info_ligas[liga.upper()]["jogos"]])
+        await ctx.send(f"**{info_ligas[liga.upper()]['name']}**\n\n{jogos}")
+        
+    @commands.command()
+    async def clean(self, ctx, id_jornada: str):
+        database = pymongo.MongoClient(port = 27017)
+        database["totobola"][id_jornada].drop()
+        database["totobola"]["jornadas"].delete_one({"id_jornada" : id_jornada})
 
     @staticmethod
     async def embed(ctx, competicao = "__Por definir__", jornada = "__Por definir__", jogos = []):

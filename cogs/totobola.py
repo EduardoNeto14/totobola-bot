@@ -8,7 +8,7 @@ PATH = "/home/eduardo/HDD/Development/Totobola"
 
 sys.path.append(f"{PATH}/utils")
 
-from utils import is_admin, is_comp
+from utils import is_admin, is_comp, is_comp_not
 
 async def database_exists(ctx):
     database = pymongo.MongoClient(port = 27017)
@@ -29,6 +29,7 @@ class Totobola(commands.Cog):
         
         properties = {
                         "admin" : [ctx.message.author.id],
+                        "channel" : None,
                         "competicoes" : []
                      }
 
@@ -80,13 +81,14 @@ class Totobola(commands.Cog):
 
         for player in database["totobola"]["jogadores"].find({} , {"player_id" : 1, "_id" : 0}):
             database["totobola"][comp].insert_one({"player_id" : player["player_id"], "pontuacao" : 0})
+            database["totobola"]["total"].update_one({"player_id" : player["player_id"]}, {"$push" : {"p_competicoes" : {"competicao" : comp, "pontuacao" : 0 }}})
 
         await ctx.send(f"Competição {comp} adicionada com sucesso!")
 
 
     @commands.command()
     @commands.check(is_admin)
-    @commands.check(is_comp)
+    @commands.check(is_comp_not)
     async def link(self, ctx, comp, link):
         with open(f"{PATH}/football/leagues.json", "r") as leagues:
             leagues = json.load(leagues)

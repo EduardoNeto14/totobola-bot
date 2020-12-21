@@ -29,10 +29,14 @@ class Registar(commands.Cog):
 
             else:
                 if database["totobola"]["jogadores"].find_one({"player_name" : f"{user.display_name}"}) is None:
-                    database["totobola"]["jogadores"].insert_one({"player_id" : user.id, "player_name" : user.display_name})
+                    database["totobola"]["jogadores"].insert_one({"player_id" : user.id, "player_name" : user.display_name, "team_id" : None})
                     
+                    n_comps = []
                     for competicao in database["totobola"]["properties"].find_one()["competicoes"]:
                         database["totobola"][f"{competicao['competicao']}"].insert_one({"player_id" : user.id, "pontuacao" : 0})
+                        n_comps.append({"competicao" : competicao['competicao'], "pontuacao" : 0 })
+
+                    database["totobola"]["total"].insert_one({"player_id": user.id, "p_competicoes" : n_comps, "pontuacao" : 0}) 
                     
                     # TODO: Melhorar mensagem #
                     embed = discord.Embed(title="Registo", colour = discord.Colour.dark_green())
