@@ -85,7 +85,6 @@ class Totobola(commands.Cog):
 
         await ctx.send(f"Competição {comp} adicionada com sucesso!")
 
-
     @commands.command()
     @commands.check(is_admin)
     @commands.check(is_comp_not)
@@ -127,6 +126,15 @@ class Totobola(commands.Cog):
             comps += f":soccer: **{competicao['competicao']}** - {competicao['name']}\n"
 
         await ctx.send(comps)
+
+    @commands.command()
+    @commands.check(is_admin)
+    async def canal(self, ctx):
+        database = pymongo.MongoClient(port = 27017)
+        database["totobola"]["properties"].update({}, {"$set" : {"channel" : ctx.channel.id}})
+
+        if (database["totobola"]["properties"].count_documents({"channel" : ctx.channel.id}) > 0):
+            await ctx.send(":white_check_mark: Canal adicionado com sucesso!")
 
 def setup(client):
     client.add_cog(Totobola(client))

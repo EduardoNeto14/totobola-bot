@@ -46,17 +46,3 @@ def calculate(game):
     if (database["totobola"]["jornadas"].count_documents({"id_jornada" : jornada["id_jornada"], "jogos.estado" : {"$ne" : "PROCESSED"}}) == 0):
         database["totobola"]["jornadas"].update_one( { "id_jornada" : jornada["id_jornada"] },
                                                      {"$set" : {"estado" : "TERMINADA"}} )
-
-game = {
-    "id": 310686,
-    "score": {
-                "winner": "AWAY_TEAM",
-                "duration": "REGULAR",
-                "fullTime": {
-                    "homeTeam": 0,
-                    "awayTeam": 2
-                }
-    }
-}
-
-calculate(game)

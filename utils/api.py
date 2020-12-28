@@ -11,13 +11,14 @@ result_to_team = {
 
 async def check_games():
     database = pymongo.MongoClient(port = 27017)
+    active = True
 
     #merge IDS from competitions
-    while True:
+    while active:
         # TODO: Atualizar os jogos conforme a API
         # TODO: Verficar se algum jogo terminou
         # TODO: Se terminou calcular pontuação
-        # TODO: Se todos os jogos estiverem STATIC, terminar jornada
+        # TODO: Se todos os jogos estiverem STATIC, terminar jornada e active = False
 
         jornadas_ativas = database["totobola"]["jornadas"].find({"estado" : "ATIVA", "jogos.estado" : {"$ne" : "PROCESSED"}}, {"_id" : 0})
 
@@ -47,8 +48,6 @@ async def get_h2h(match):
                      params={"status" : "FINISHED", "limit" : 5},
                      headers={"X-Auth-Token" : api_token}).json()
 
-#        print(data)
-
         for m in data["matches"]:
             teams_id = [m["homeTeam"]["id"], m["awayTeam"]["id"]]
             teams_name = [m["homeTeam"]["name"], m["awayTeam"]["name"]]
@@ -65,7 +64,7 @@ async def get_h2h(match):
                 if result_to_team[m["score"]["winner"]] == field : icon = ":green_circle:"
                 else : icon = ":red_circle:"
 
-            result[i].append(f"{icon} {m['score']['fullTime']['homeTeam']}-{m['score']['fullTime']['awayTeam']} vs {other}")
+            result[i].append(f"{icon} `{m['score']['fullTime']['homeTeam']}-{m['score']['fullTime']['awayTeam']} vs {other}`")
     
     await asyncio.sleep(15)
     
