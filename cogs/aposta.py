@@ -298,6 +298,67 @@ class Aposta(commands.Cog):
         embed.set_footer(text = "Totobola Discordiano", icon_url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
 
         await channel.send(embed = embed)
+    
+    def send_bet(self, user, competicao):
+            database = pymongo.MongoClient(port = 27017)
+            jornada = database["totobola"]["jornadas"].find_one({"competicao" : competicao}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
+                    
+            if jornada is not None:
+                bet = database["totobola"][jornada["id_jornada"]].find_one({"player_id" : user.id, "estado" : {"$ne" : "INATIVA"}}, {"_id" : 0, "apostas" : 1, "joker" : 1, "pontuacao" : 1})
+                
+                print(bet)
+
+                if bet is not None:
+                    embed = discord.Embed(title = "Aposta", colour = discord.Colour.dark_blue())
+                    embed.set_thumbnail(url = user.avatar_url)
+                    embed.add_field(name = "Jogador", value = user.display_name)
+                    embed.add_field(name = "Pontuação", value = bet["pontuacao"])
+
+                    games = ""
+
+                    for j, jogo in enumerate(bet["apostas"]):
+                        if jogo["resultado"] is None:
+                            pass
+                        else:
+                            if bet["joker"]["id_jogo"] == jogo["id_jogo"]:
+                                games += ":black_joker: "
+                            games += f":soccer: `{jogo['id_jogo']}` **{jornada['jogos'][j]['homeTeam']} {jogo['resultado']} {jornada['jogos'][j]['awayTeam']}**\n"
+                    
+                    embed.description = games
+                
+                    return embed
+                else:
+                    return -2
+            else:
+                return -1
+    
+    @commands.command()
+    async def aposta(self, ctx, competicao, *args):
+        if len(args) == 0:
+            embed = self.send_bet(ctx.author, competicao)
+            if embed not in [-1, -2]:
+                await ctx.send(embed = embed)
+            elif embed == -1:
+                await ctx.send("Não existe uma jornada ativa!")
+            elif embed == -2:
+                await ctx.send("Jogador ainda não apostou!")
+
+        elif len(args) == 1:
+            if ctx.message.mentions is not None:
+                embed = self.send_bet(ctx.message.mentions[0], competicao)
+                if embed not in [-1, -2]:
+                    await ctx.send(embed = embed)
+                elif embed == -1:
+                    await ctx.send("Não existe uma jornada ativa!")
+                elif embed == -2:
+                    await ctx.send("Jogador ainda não apostou!")
+
+            else:
+                await ctx.send("Precisas de mencionar alguém!")
+        else:
+            await ctx.send("Demasiados argumentos. O comando deve ser utilizado da seguinte forma: **td!aposta [competição] @(opcional)**")
+
+    
 
 def setup(client):
     client.add_cog(Aposta(client))
