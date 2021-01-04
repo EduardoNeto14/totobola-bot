@@ -27,7 +27,7 @@ class Aposta(commands.Cog):
             await user.send(":pencil2: Não existem jornadas ativas!")
             return
 
-        jornadas = database["totobola"]["jornadas"].find({"estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
+        jornadas = database["totobola"]["jornadas"].find({"estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1, "competicao" : 1})
         
         if jornadas.count() == 0: return
         
@@ -77,7 +77,8 @@ class Aposta(commands.Cog):
             await user.send(embed = embed)
             
             database["totobola"][j["id_jornada"]].update({"player_id" : user.id}, {"$set" : {"current" : j["jogos"][position["index"]]['id_jogo'], "status" : "ATIVA"}})
-    
+            database["totobola"][jornada["competicao"]].update({"player_id" : user.id}, {"$inc" : {"apostas" : 1}})
+            
         except StopIteration:
             print("[Jornada - Erro] Posição não encontrada!")
     
@@ -320,9 +321,12 @@ class Aposta(commands.Cog):
                         if jogo["resultado"] is None:
                             pass
                         else:
+                            games += f":soccer: `{jogo['id_jogo']}` **{jornada['jogos'][j]['homeTeam']} {jogo['resultado']} {jornada['jogos'][j]['awayTeam']}**"
+                            
                             if bet["joker"]["id_jogo"] == jogo["id_jogo"]:
-                                games += ":black_joker: "
-                            games += f":soccer: `{jogo['id_jogo']}` **{jornada['jogos'][j]['homeTeam']} {jogo['resultado']} {jornada['jogos'][j]['awayTeam']}**\n"
+                                games += " :black_joker:\n"
+                            else:
+                                games += "\n"
                     
                     embed.description = games
                 

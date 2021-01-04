@@ -43,7 +43,7 @@ class Totobola(commands.Cog):
         # TODO : Melhorar mensagem #
         embed = discord.Embed(title = "Registo", colour = discord.Colour.dark_gold())
         embed.set_thumbnail(url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
-        embed.description = f"Para te registares na prova, basta clicares no :writing_hand:.\n\nCompetições adicionadas:\n"
+        embed.description = f"Para te registares na prova, basta clicares no :writing_hand:.\n"
         embed.set_footer(text = "Totobola Discordiano")
 
         message = await ctx.send(embed = embed)
@@ -80,10 +80,10 @@ class Totobola(commands.Cog):
         database["totobola"]["properties"].update(database["totobola"]["properties"].find_one({}, {"_id": 1}), {"$push" : {"competicoes" : {"competicao" : comp, "link" : None, "name" : None}}})
 
         for player in database["totobola"]["jogadores"].find({} , {"player_id" : 1, "_id" : 0}):
-            database["totobola"][comp].insert_one({"player_id" : player["player_id"], "pontuacao" : 0})
+            database["totobola"][comp].insert_one({"player_id" : player["player_id"], "pontuacao" : 0, "apostas" : 0})
             database["totobola"]["total"].update_one({"player_id" : player["player_id"]}, {"$push" : {"p_competicoes" : {"competicao" : comp, "pontuacao" : 0 }}})
 
-        await ctx.send(f"Competição {comp} adicionada com sucesso!")
+        await ctx.send(f":trophy: **Competição {comp} adicionada com sucesso!**")
 
     @commands.command()
     @commands.check(is_admin)

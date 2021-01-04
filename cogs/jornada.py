@@ -120,7 +120,7 @@ class Jornada(commands.Cog):
                                 })
 
                                 jogos.remove(str(jogo["id_jogo"]))
-                                link.add(league)
+                                link.add(info["id"])
 
                     if len(jogos) > 0:
                         await ctx.send(f":x: Jogos *{' '.join(jogos)}* incorretos!")
@@ -130,7 +130,9 @@ class Jornada(commands.Cog):
 
                         database["totobola"]["jornadas"].insert_one(jornada)
                         await self.send_to_players(database, jornada)
-
+            
+            if self.task is None:
+                self.task = self.client.loop.create_task(check_games())
         else:
             await ctx.send(":octagonal_sign: A competição indicada não existe!")
 
