@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import pymongo
+import asyncio
 
 class Info(commands.Cog):
     def __init__(self, client):
@@ -24,10 +25,17 @@ class Info(commands.Cog):
                 if info is not None:
                     data_to_send += f":trophy: **{comp['competicao']}**\n"
                     data_to_send += f"**Posição:** `1º` **Pontuação:** `{info['pontuacao']}` **Apostas:** `{info['apostas']}`\n\n"
+
+            competicoes = database["totobola"]["total"].find_one({{"player_id" : ctx.message.mentions[0].id}}, {"_id" : 0})
+            
+            if competicoes is not None:
+                data_to_send += f":trophy: **Total**\n"
+                data_to_send += f"**Posição:** `1º` **Pontuação:** `{competicoes['pontuacao']}\n\n`"
             
             embed.description = data_to_send
             embed.add_field(name = "Jogador", value = f"`{ctx.message.mentions[0].display_name}`")
             embed.set_thumbnail(url = ctx.message.mentions[0].avatar_url)
+            
             await ctx.send(embed = embed)
 
         elif len(args) == 0:
@@ -45,9 +53,16 @@ class Info(commands.Cog):
                     data_to_send += f":trophy: **{comp['competicao']}**\n"
                     data_to_send += f"**Posição:** `1º` **Pontuação:** `{info['pontuacao']}` **Apostas:** `{info['apostas']}`\n\n"
             
+            competicoes = database["totobola"]["total"].find_one({{"player_id" : ctx.message.author.id}}, {"_id" : 0})
+            
+            if competicoes is not None:
+                data_to_send += f":trophy: **Total**\n"
+                data_to_send += f"**Posição:** `1º` **Pontuação:** `{competicoes['pontuacao']}\n\n`"
+
             embed.description = data_to_send
             embed.add_field(name = "Jogador", value = f"`{ctx.message.author.display_name}`")
             embed.set_thumbnail(url = ctx.message.author.avatar_url)
+
             await ctx.send(embed = embed)
         else:
             await ctx.send("meh")
@@ -74,7 +89,12 @@ class Info(commands.Cog):
 
     @commands.command()
     async def table(self, ctx, competicao):
-        pass
+        database = pymongo.MongoClient(port = 27017)
+
+        if competicao in database["totobola"].list_collection_names():
+            await self.pages(ctx = ctx, competicao = competicao)
+        else:
+            await ctx.send(":x: Competição não existe!")
 
     @commands.command()
     async def jogos(self, ctx, competicao):
@@ -90,6 +110,65 @@ class Info(commands.Cog):
             jogos += f":soccer: `{jogo['id_jogo']}`: **{jogo['homeTeam']} - {jogo['awayTeam']}**\n"
 
         await ctx.send(jogos)
+
+    async def pages(self, ctx, competicao, msg = None, start = 0, per_page = 10, max = None):
+        database = pymongo.MongoClient(port = 27017)
+
+        if max is None:
+            max = int(database["totobola"][competicao].count_documents({}) / per_page) + 1
+        
+        players = database["totobola"][competicao].aggregate(
+            [{"$lookup" : 
+                        { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
+            {"$sort" : {"pontuacao" : 1}},
+            {"$unwind" : "$table"},
+            {"$project" :
+                        { "player_id" : 1, "table.player_name" : 1, "pontuacao" : 1, "apostas" : 1}},
+            {"$limit" : per_page},
+            {"$skip" : start*per_page}
+        ])
+
+        data_to_send = ""
+        for p, player in enumerate(players):
+            if p + start*per_page < 3:
+                medals = [":first_place:", ":second_place:", ":third_place:"]
+                data_to_send += f"{medals[p]} **{player['table']['player_name']}**\n\t\t\t:dart: **Pontuação:** `{player['pontuacao']}`\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
+            else:
+                data_to_send += f"`{p + 1}º` **{player['table']['player_name']}**\n\t\t\t:dart: **Pontuação:** `{player['pontuacao']}`\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
+        
+        embed = discord.Embed(title = f"Tabela {competicao}", colour = discord.Colour.dark_magenta())
+        embed.description = data_to_send
+
+        if msg is not None:
+            await msg.edit(embed=embed)
+            if not isinstance(msg.channel, discord.abc.PrivateChannel):
+                await msg.clear_reactions()
+        else:
+            msg = await ctx.send(embed=embed)
+        
+        
+        if start > 0:
+            await msg.add_reaction('⏪')
+        elif start < max - 1:
+            await msg.add_reaction('⏩')
+
+        # wait for reactions (2 minutes)
+        def check(reaction, user):
+            return True if user != self.client.user and str(reaction.emoji) in ['⏪', '⏩'] and reaction.message.id == msg.id else False
+        
+        try:
+            reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
+        except asyncio.TimeoutError:
+            pass
+        
+        else:
+            # redirect on reaction
+            if reaction is None:
+                return
+            elif reaction.emoji == '⏪' and start > 0:
+                await self.pages(ctx=ctx, competicao=competicao, msg=msg, start=start-1, per_page=per_page, max=max)
+            elif reaction.emoji == '⏩' and start < max - 1:
+                await self.pages(ctx=ctx, competicao=competicao, msg=msg, start=start+1, per_page=per_page, max=max)
 
 def setup(client):
     client.add_cog(Info(client))
