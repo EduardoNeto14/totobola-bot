@@ -132,7 +132,7 @@ class Jornada(commands.Cog):
                         await self.send_to_players(database, jornada)
             
             if self.task is None:
-                self.task = self.client.loop.create_task(check_games())
+                self.task = self.client.loop.create_task(check_games(self.client))
         else:
             await ctx.send(":octagonal_sign: A competição indicada não existe!")
 
@@ -140,7 +140,7 @@ class Jornada(commands.Cog):
     @commands.check( is_admin )
     async def load(self, ctx):
         print("load")
-        self.task = self.client.loop.create_task(check_games())
+        self.task = self.client.loop.create_task(check_games(self.client))
     
     @commands.command()
     @commands.check( is_admin )

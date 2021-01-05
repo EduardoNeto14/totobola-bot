@@ -2,6 +2,8 @@ import asyncio
 import pymongo
 import requests
 
+from results import calculate
+
 PATH = "/home/eduardo/HDD/Development/Totobola"
 
 result_to_team = {
@@ -9,7 +11,7 @@ result_to_team = {
     "HOME_TEAM": "homeTeam"
 }
 
-async def check_games():
+async def check_games(client):
     database = pymongo.MongoClient(port = 27017)
     active = True
 
@@ -37,6 +39,33 @@ async def check_games():
                                     params = {"competitions" : active_matchday},
                                     headers = {"X-Auth-Token" : token}).json()
         print(request["filters"]) 
+        
+        for match in request["matches"]:
+            if match["status"] == "SCHEDULED":
+                print(f"{match['id']} -> SCHEDULED")
+                # Não tem que se fazer nada, pois o jogo ainda não começou
+            elif match["status"] == "LIVE" or match["status"] == "IN_PLAY":
+                print(f"{match['id']} -> LIVE")
+                # Atualizar o estado do jogo na base de dados, para que o jogo fique bloqueado
+                database["totobola"]["jornadas"].update({"jogos.id_jogo" : match["id"]}, {"$set" : {"jogos.$.estado" : "LIVE"}})
+                
+                for jornada in jornadas:
+                    for jogo in jornada["jogos"]:
+                        if match["id"] == jogo["id_jogo"]:
+                            database["totobola"][jornada["id_jornada"]].update({"joker.id_jogo" : match["id"]}, {"$set" : {"joker.$.processed" : 1}})
+                            break
+
+                # Talvez atualizar resultado?
+            elif match["status"] == "FINISHED":
+                print(f"{match['id']} -> FINISHED")
+                await calculate(match, client)
+                # Verificar se o jogo foi processado. Se sim, passar à frente. Se não, calcular pontos.
+            else:
+                print(f"{match['id']} -> {match['status']}")
+        
+        if (database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA"})) == 0:
+            active = False
+        
         await asyncio.sleep(60)
         
         # TODO: Se o tamanho de jornadas for 0, então active = False 
@@ -44,13 +73,6 @@ async def check_games():
         # TODO: Atualizar os jogos conforme a API
         # TODO: Se terminou calcular pontuação
         # TODO: Se todos os jogos estiverem STATIC, terminar jornada e active = False
-
-        #jornadas_ativas = database["totobola"]["jornadas"].find({"estado" : "ATIVA", "jogos.estado" : {"$ne" : "PROCESSED"}}, {"_id" : 0})
-        #
-        #for jornada in jornadas_ativas:
-        #    print(jornada)
-        #    database["totobola"]["jornada"].update({"id_jornada" : jornada["id_jornada"], "jogos.id_jogo" : })
-        
 
 async def get_h2h(match):
     with open(f"{PATH}/api-token.txt", "rb") as token:

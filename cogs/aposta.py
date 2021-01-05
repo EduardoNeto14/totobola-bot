@@ -77,7 +77,7 @@ class Aposta(commands.Cog):
             await user.send(embed = embed)
             
             database["totobola"][j["id_jornada"]].update({"player_id" : user.id}, {"$set" : {"current" : j["jogos"][position["index"]]['id_jogo'], "status" : "ATIVA"}})
-            database["totobola"][jornada["competicao"]].update({"player_id" : user.id}, {"$inc" : {"apostas" : 1}})
+            database["totobola"][jornada["competicao"]].update_one({"player_id" : user.id}, {"$inc" : {"apostas" : 1}})
             
         except StopIteration:
             print("[Jornada - Erro] Posição não encontrada!")
