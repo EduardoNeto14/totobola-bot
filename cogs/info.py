@@ -7,7 +7,7 @@ class Info(commands.Cog):
     def __init__(self, client):
         self.client = client
 
-    @commands.command()
+    @commands.command(brief = "**Informação sobre um jogador!**", description = "**Utilização:** `td!player (jogador)`")
     async def player(self, ctx, *args):
         database = pymongo.MongoClient(port = 27017)
 
@@ -24,9 +24,9 @@ class Info(commands.Cog):
                 print(info)
                 if info is not None:
                     data_to_send += f":trophy: **{comp['competicao']}**\n"
-                    data_to_send += f"**Posição:** `1º` **Pontuação:** `{info['pontuacao']}` **Apostas:** `{info['apostas']}`\n\n"
+                    data_to_send += f"**Posição:** `1º` **Pontuação:** `{info['pontuacao']}` **Apostas:** `{int(info['apostas'])}`\n\n"
 
-            competicoes = database["totobola"]["total"].find_one({{"player_id" : ctx.message.mentions[0].id}}, {"_id" : 0})
+            competicoes = database["totobola"]["total"].find_one({"player_id" : ctx.message.mentions[0].id}, {"_id" : 0})
             
             if competicoes is not None:
                 data_to_send += f":trophy: **Total**\n"
@@ -51,9 +51,9 @@ class Info(commands.Cog):
                 print(info)
                 if info is not None:
                     data_to_send += f":trophy: **{comp['competicao']}**\n"
-                    data_to_send += f"**Posição:** `1º` **Pontuação:** `{info['pontuacao']}` **Apostas:** `{info['apostas']}`\n\n"
+                    data_to_send += f"**Posição:** `1º` **Pontuação:** `{info['pontuacao']}` **Apostas:** `{int(info['apostas'])}`\n\n"
             
-            competicoes = database["totobola"]["total"].find_one({{"player_id" : ctx.message.author.id}}, {"_id" : 0})
+            competicoes = database["totobola"]["total"].find_one({"player_id" : ctx.message.author.id}, {"_id" : 0})
             
             if competicoes is not None:
                 data_to_send += f":trophy: **Total**\n"
@@ -68,7 +68,7 @@ class Info(commands.Cog):
             await ctx.send("meh")
         pass
 
-    @commands.command()
+    @commands.command(brief = "**Mostra todas as jornadas de uma competição!**", description = "**Utilização:** `td!jornadas [competição]`")
     async def jornadas(self, ctx, competicao):
         database = pymongo.MongoClient(port = 27017)
         jornadas = database["totobola"]["jornadas"].find({"competicao" : competicao}, {"_id" : 0, "id_jornada" : 1, "estado" : 1})
@@ -87,7 +87,7 @@ class Info(commands.Cog):
 
         await ctx.send(str_jornadas)
 
-    @commands.command()
+    @commands.command(brief = "**Mostra a tabela de uma determinada competição!**", description = "**Utilização:** `td!table [competição]`")
     async def table(self, ctx, competicao):
         database = pymongo.MongoClient(port = 27017)
 
@@ -96,7 +96,7 @@ class Info(commands.Cog):
         else:
             await ctx.send(":x: Competição não existe!")
 
-    @commands.command()
+    @commands.command(brief = "**Mostra os jogdos de uma jornada ativa de uma competição!**", description = "**Utilização:** `td!jogos [competição]`")
     async def jogos(self, ctx, competicao):
         database = pymongo.MongoClient(port = 27017)
         jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "competicao" : competicao}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
@@ -117,25 +117,47 @@ class Info(commands.Cog):
         if max is None:
             max = int(database["totobola"][competicao].count_documents({}) / per_page) + 1
         
-        players = database["totobola"][competicao].aggregate(
-            [{"$lookup" : 
-                        { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
-            {"$sort" : {"pontuacao" : 1}},
-            {"$unwind" : "$table"},
-            {"$project" :
-                        { "player_id" : 1, "table.player_name" : 1, "pontuacao" : 1, "apostas" : 1}},
-            {"$limit" : per_page},
-            {"$skip" : start*per_page}
-        ])
+        if competicao != "total":
+            players = database["totobola"][competicao].aggregate(
+                [{"$lookup" : 
+                            { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
+                {"$sort" : {"pontuacao" : 1}},
+                {"$unwind" : "$table"},
+                {"$project" :
+                            { "player_id" : 1, "table.player_name" : 1, "pontuacao" : 1, "apostas" : 1}},
+                {"$limit" : per_page},
+                {"$skip" : start*per_page}
+            ])
+        else:
+            players = database["totobola"][competicao].aggregate(
+                [{"$lookup" : 
+                            { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
+                {"$sort" : {"pontuacao" : 1}},
+                {"$unwind" : "$table"},
+                {"$project" :
+                            { "player_id" : 1, "table.player_name" : 1, "pontuacao" :1}},
+                {"$limit" : per_page},
+                {"$skip" : start*per_page}
+            ])
 
         data_to_send = ""
         for p, player in enumerate(players):
             if p + start*per_page < 3:
                 medals = [":first_place:", ":second_place:", ":third_place:"]
-                data_to_send += f"{medals[p]} **{player['table']['player_name']}**\n\t\t\t:dart: **Pontuação:** `{player['pontuacao']}`\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
+                data_to_send += f"{medals[p]} **{player['table']['player_name']}**\n:dart: **Pontuação:** `{player['pontuacao']}`"
+
+                if competicao != "total":
+                    data_to_send += f"\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
+                else:
+                    data_to_send += "\n"
             else:
-                data_to_send += f"`{p + 1}º` **{player['table']['player_name']}**\n\t\t\t:dart: **Pontuação:** `{player['pontuacao']}`\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
-        
+                data_to_send += f"`{p + 1}º` **{player['table']['player_name']}**\n:dart: **Pontuação:** `{player['pontuacao']}`"
+
+                if competicao != "total":
+                    data_to_send += f"\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
+                else:
+                    data_to_send += "\n"
+
         embed = discord.Embed(title = f"Tabela {competicao}", colour = discord.Colour.dark_magenta())
         embed.description = data_to_send
 
@@ -146,10 +168,9 @@ class Info(commands.Cog):
         else:
             msg = await ctx.send(embed=embed)
         
-        
         if start > 0:
             await msg.add_reaction('⏪')
-        elif start < max - 1:
+        if start < max - 1:
             await msg.add_reaction('⏩')
 
         # wait for reactions (2 minutes)
@@ -169,6 +190,10 @@ class Info(commands.Cog):
                 await self.pages(ctx=ctx, competicao=competicao, msg=msg, start=start-1, per_page=per_page, max=max)
             elif reaction.emoji == '⏩' and start < max - 1:
                 await self.pages(ctx=ctx, competicao=competicao, msg=msg, start=start+1, per_page=per_page, max=max)
+
+    @commands.command(brief = "**Mostra todos os vencedores da jornada!**", description = "**Utilização:** `td!geraldes`")
+    async def geraldes(self, ctx):
+        print("Mostrar os vencedores!")
 
 def setup(client):
     client.add_cog(Info(client))

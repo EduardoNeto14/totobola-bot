@@ -7,7 +7,7 @@ class Team(commands.Cog):
     def __init__(self, client):
         self.client = client
 
-    @commands.command()
+    @commands.command(brief = "**Cria uma equipa!**", description = "**Utilização:** `td!team [jogador] [jogador]`")
     async def team(self, ctx, name: str, member1 : discord.abc.User, member2 : discord.abc.User):
         print(isinstance(name, discord.abc.User))
         print(isinstance(member1, discord.abc.User))
@@ -27,7 +27,7 @@ class Team(commands.Cog):
         # } 
         pass
     
-    @commands.command()
+    @commands.command(brief = "**Mostra o campeonato das equipas!**", description = "**Utilização:** `td!classificacao`")
     async def classificacao(self, ctx):
         pass
 

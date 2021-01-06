@@ -20,7 +20,7 @@ class Jornada(commands.Cog):
         self.client = client
         self.task = None
     
-    @commands.command()
+    @commands.command(brief = "**Cria uma jornada!**", description = "**Utilização:** `td!jornada [competição] (jogos)`")
     @commands.check( is_admin )
     async def jornada( self, ctx, comp: str, *jogos: str):
         database = pymongo.MongoClient(port = 27017)
@@ -136,20 +136,20 @@ class Jornada(commands.Cog):
         else:
             await ctx.send(":octagonal_sign: A competição indicada não existe!")
 
-    @commands.command()
+    @commands.command(brief = "**Monitoriza os jogos em atividade!**", description = "**Utilização:** `td!load`")
     @commands.check( is_admin )
     async def load(self, ctx):
         print("load")
         self.task = self.client.loop.create_task(check_games(self.client))
     
-    @commands.command()
+    @commands.command(brief = "**Para de monitorizar os jogos em atividade!**", description = "**Utilização:** `td!unload`")
     @commands.check( is_admin )
     async def unload(self, ctx):
         print("unload")
         self.task.cancel()
         self.task = None
 
-    @commands.command()
+    @commands.command(brief = "**Vai encontrar os jogos de uma determinada liga!**", description = "**Utilização:** `td!get (ligas)`")
     @commands.check( is_admin )
     async def get(self, ctx, *ligas):
         with open(f"{PATH}/football/leagues.json", "r") as leagues:
@@ -203,7 +203,7 @@ class Jornada(commands.Cog):
 
         await ctx.send(":point_right: Informação recolhida. Podes aceder aos jogos através de **td!games [liga]**!")
 
-    @commands.command()
+    @commands.command(brief = "**Verifica os jogos das ligas!**", description = "**Utilização:** `td!games [liga]`")
     @commands.check(is_admin)
     async def games(self, ctx, liga: str):
         if not os.path.isfile(f"{PATH}/temp/jornada.json"):
@@ -220,7 +220,7 @@ class Jornada(commands.Cog):
         jogos = '\n'.join([f':soccer: `{jogo["id_jogo"]}`: {jogo["homeTeam"]["name"]} - {jogo["awayTeam"]["name"]}' for jogo in info_ligas[liga.upper()]["jogos"]])
         await ctx.send(f"**{info_ligas[liga.upper()]['name']}**\n\n{jogos}")
         
-    @commands.command()
+    @commands.command(brief = "**Limpa uma jornada!**", description = "**Utilização:** `td!clean [id jornada]`")
     async def clean(self, ctx, id_jornada: str):
         database = pymongo.MongoClient(port = 27017)
         database["totobola"][id_jornada].drop()

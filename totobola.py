@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import os
 
-client = commands.Bot(command_prefix = "td!")
+client = commands.Bot(command_prefix = "td!", help_command = None)
 PATH = "/home/eduardo/HDD/Development/Totobola"
 
 with open(f"{PATH}/token.txt", "r") as token:

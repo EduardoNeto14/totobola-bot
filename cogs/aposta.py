@@ -223,7 +223,7 @@ class Aposta(commands.Cog):
         else:
             return
 
-    @commands.command()
+    @commands.command(brief = "**Atualizar um determinado jogo!**", description = "**Utilização:** `td!update [competição] [id jogo] [resultado]`")
     @commands.check(is_comp_not)
     async def update(self, ctx, comp : str, id_jogo: str, *res):
         database = pymongo.MongoClient(port = 27017)
@@ -302,10 +302,10 @@ class Aposta(commands.Cog):
     
     def send_bet(self, user, competicao):
             database = pymongo.MongoClient(port = 27017)
-            jornada = database["totobola"]["jornadas"].find_one({"competicao" : competicao}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
+            jornada = database["totobola"]["jornadas"].find_one({"competicao" : competicao, "estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
                     
             if jornada is not None:
-                bet = database["totobola"][jornada["id_jornada"]].find_one({"player_id" : user.id, "estado" : {"$ne" : "INATIVA"}}, {"_id" : 0, "apostas" : 1, "joker" : 1, "pontuacao" : 1})
+                bet = database["totobola"][jornada["id_jornada"]].find_one({"player_id" : user.id, "estado" : {"$ne" : "TERMINADA"}}, {"_id" : 0, "apostas" : 1, "joker" : 1, "pontuacao" : 1})
                 
                 print(bet)
 
@@ -336,7 +336,7 @@ class Aposta(commands.Cog):
             else:
                 return -1
     
-    @commands.command()
+    @commands.command(brief = "**Verificar aposta numa jornada ativa de uma competição!**", description ="**Utilização:** `td!aposta [competicao] (jogador)`")
     async def aposta(self, ctx, competicao, *args):
         if len(args) == 0:
             embed = self.send_bet(ctx.author, competicao)
@@ -362,7 +362,9 @@ class Aposta(commands.Cog):
         else:
             await ctx.send("Demasiados argumentos. O comando deve ser utilizado da seguinte forma: **td!aposta [competição] @(opcional)**")
 
-    
-
+    @commands.command(brief = "**Verificar aposta em jornadas terminadas!**", description = "**Utilização:** `td!apostada [id jornada]`")
+    async def apostada(self, ctx, id_jornada):
+        database = pymongo.MongoClient(port = 27017)
+        
 def setup(client):
     client.add_cog(Aposta(client))

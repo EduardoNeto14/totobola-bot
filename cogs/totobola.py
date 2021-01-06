@@ -3,6 +3,7 @@ from discord.ext import commands
 import pymongo
 import sys
 import json
+import asyncio
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
 
@@ -22,7 +23,7 @@ class Totobola(commands.Cog):
     def __init__(self, client):
         self.client = client
     
-    @commands.command()
+    @commands.command(brief = "**Inicia o Totobola Discordiano!**", description = "**Utilização:** `td!totobola (competições)`")
     @commands.check(database_exists)
     async def totobola(self, ctx, *args):
         database = pymongo.MongoClient(port = 27017)
@@ -55,7 +56,7 @@ class Totobola(commands.Cog):
             "message_id" : message.id
         })
 
-    @commands.command()
+    @commands.command(brief = "**Adiciona um administrador!**", description = "**Utilização:** `td!admin [jogador]`")
     @commands.check(is_admin)
     async def admin(self, ctx, mention):
         database = pymongo.MongoClient(port= 27017)
@@ -72,7 +73,7 @@ class Totobola(commands.Cog):
 
         await ctx.send(embed = embed)
 
-    @commands.command()
+    @commands.command(brief = "**Adiciona uma competição!**", description = "**Utilização:** `td!add [competição]`")
     @commands.check(is_admin)
     @commands.check(is_comp)
     async def add(self, ctx, comp):
@@ -85,7 +86,7 @@ class Totobola(commands.Cog):
 
         await ctx.send(f":trophy: **Competição {comp} adicionada com sucesso!**")
 
-    @commands.command()
+    @commands.command(brief = "**Relaciona uma competição com uma liga!**", description = "**Utilização:** `td!link [competição] [liga]`")
     @commands.check(is_admin)
     @commands.check(is_comp_not)
     async def link(self, ctx, comp, link):
@@ -101,7 +102,7 @@ class Totobola(commands.Cog):
         else:
             await ctx.send(":x: O código dessa competição não existe!")
 
-    @commands.command()
+    @commands.command(brief = "**Verifica as ligas disponíveis!**", description = "**Utilização:** `td!ligas`")
     @commands.check(is_admin)
     async def ligas(self, ctx):
         with open(f"{PATH}/football/leagues.json", "r") as leagues:
@@ -113,7 +114,7 @@ class Totobola(commands.Cog):
         
         await ctx.send(l)
 
-    @commands.command()
+    @commands.command(brief = "**Verifica as competições existentes no Totobola!**", description = "**Utilização:** `td!competicoes`")
     @commands.check(is_admin)
     async def competicoes(self, ctx):
         database = pymongo.MongoClient(port = 27017)
@@ -127,7 +128,7 @@ class Totobola(commands.Cog):
 
         await ctx.send(comps)
 
-    @commands.command()
+    @commands.command(brief = "**Liga o bot a um canal. Utilizar no canal pretendido!**", description = "**Utilização:** `td!canal`")
     @commands.check(is_admin)
     async def canal(self, ctx):
         database = pymongo.MongoClient(port = 27017)
@@ -135,6 +136,50 @@ class Totobola(commands.Cog):
 
         if (database["totobola"]["properties"].count_documents({"channel" : ctx.channel.id}) > 0):
             await ctx.send(":white_check_mark: Canal adicionado com sucesso!")
+
+    @commands.command(brief = "**Mostra todos os comandos!**", description = "**Utilização:** `td!help (comando)`")
+    async def help(self, ctx):
+        await self.pages(ctx = ctx)
+
+    async def pages(self, ctx, msg = None, start = 0, per_page = 5, max = None):
+        if max is None:
+            max = int(len(self.client.commands) / per_page) + 1
+
+        data_to_send = ""
+        for c, command in enumerate(self.client.commands):
+            if c >= start*per_page and c < start*per_page + per_page:
+                data_to_send += f":reminder_ribbon:\t\t{command.name}\n{command.brief}\n{command.description}\n\n"
+        
+        embed = discord.Embed(title = "Comandos", colour = discord.Colour.lighter_grey())
+        embed.description = data_to_send
+
+        if msg is not None:
+            await msg.edit(embed = embed)
+            if not isinstance(msg.channel, discord.abc.PrivateChannel):
+                await msg.clear_reactions()
+        else:
+            msg = await ctx.send(embed = embed)
+
+        if start > 0:
+            await msg.add_reaction('⏪')
+        if start < max - 1:
+            await msg.add_reaction('⏩')
+
+        def check(reaction, user):
+            return True if user != self.client.user and str(reaction.emoji) in ['⏪', '⏩'] and reaction.message.id == msg.id else False
+
+        try:
+            reaction, user = await self.client.wait_for("reaction_add", timeout = 60, check = check)
+        except asyncio.TimeoutError:
+            pass
+
+        else:
+            if reaction is None:
+                return
+            elif reaction.emoji == '⏪' and start > 0:
+                await self.pages(ctx=ctx, msg=msg, start=start-1, per_page=per_page, max=max)
+            elif reaction.emoji == '⏩' and start < max - 1:
+                await self.pages(ctx=ctx, msg=msg, start=start+1, per_page=per_page, max=max)
 
 def setup(client):
     client.add_cog(Totobola(client))

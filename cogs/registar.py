@@ -51,7 +51,7 @@ class Registar(commands.Cog):
                     # TODO: Melhorar mensagem #
                     await user.send(f"Já te encontras registado, {user.display_name}!")
 
-    @commands.command()
+    @commands.command(brief = "**Para efetuar o registo!**", description = "**Utilização:** `td!registar`")
     @commands.check(database_exists)
     async def registar(self, ctx, *args):      
 
