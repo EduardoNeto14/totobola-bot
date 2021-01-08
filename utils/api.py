@@ -38,7 +38,6 @@ async def check_games(client):
             request = requests.get(f"http://api.football-data.org/v2/matches/",
                                     params = {"competitions" : active_matchday},
                                     headers = {"X-Auth-Token" : token}).json()
-        print(request["filters"]) 
         
         for match in request["matches"]:
             if match["status"] == "SCHEDULED":
@@ -64,16 +63,12 @@ async def check_games(client):
                 print(f"{match['id']} -> {match['status']}")
         
         if (database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA"})) == 0:
+            #calcular campeonato equipas
+            
             active = False
         
         await asyncio.sleep(60)
         
-        # TODO: Se o tamanho de jornadas for 0, então active = False 
-        # TODO: Verficar se algum jogo terminou
-        # TODO: Atualizar os jogos conforme a API
-        # TODO: Se terminou calcular pontuação
-        # TODO: Se todos os jogos estiverem STATIC, terminar jornada e active = False
-
 async def get_h2h(match):
     with open(f"{PATH}/api-token.txt", "rb") as token:
         api_token = token.readline()

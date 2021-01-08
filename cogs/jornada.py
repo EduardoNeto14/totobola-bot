@@ -10,6 +10,7 @@ import asyncio
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
 sys.path.append(f"{PATH}/utils/")
+logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
 
 from utils import is_admin
 from api import check_games, get_h2h, get_jornada, get_num_jornada
@@ -257,7 +258,7 @@ class Jornada(commands.Cog):
         embed.add_field(name = "Competição", value=jornada["competicao"])
         embed.add_field(name = "ID", value = jornada["id_jornada"])
         embed.description = jogos + "\n\n" + "Para postar basta clicar em :page_facing_up:"
-        embed.set_footer(text = "Totobola Discordiano", icon_url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
+        embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
         
         for _user in database["totobola"]["jogadores"].find({}, {"_id" : 0}):
             user = await self.client.fetch_user(_user["player_id"])

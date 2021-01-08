@@ -6,6 +6,7 @@ import sys
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
 sys.path.append(f"{PATH}/utils/")
+logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
 
 from utils import is_comp, is_comp_not
 
@@ -75,9 +76,10 @@ class Aposta(commands.Cog):
             embed.add_field(name = f"H2H {j['jogos'][position['index']]['awayTeam']}", value = h2hAway)
             
             await user.send(embed = embed)
+            await reaction.message.unpin()
             
             database["totobola"][j["id_jornada"]].update({"player_id" : user.id}, {"$set" : {"current" : j["jogos"][position["index"]]['id_jogo'], "status" : "ATIVA"}})
-            database["totobola"][jornada["competicao"]].update_one({"player_id" : user.id}, {"$inc" : {"apostas" : 1}})
+            database["totobola"][j["competicao"]].update_one({"player_id" : user.id}, {"$inc" : {"apostas" : 1}})
             
         except StopIteration:
             print("[Jornada - Erro] Posição não encontrada!")
@@ -136,6 +138,17 @@ class Aposta(commands.Cog):
                 ''' If the said flag is True, than the prognostic for that game is not valid. We then update the current game of the users's bet '''
                 if blocked:
                     await message.author.send(":lock: O jogo em que tentaste apostar já não se encontra ativo!")
+                    embed = discord.Embed(title = "Aposta", colour = discord.Colour.green())
+                    embed.set_thumbnail(url = message.author.avatar_url)
+                    
+                    embed.description = f"**Próximo jogo:**\n:soccer:`{jornada['jogos'][position['index']]['id_jogo']}`: {jornada['jogos'][position['index']]['homeTeam']} - {jornada['jogos'][position['index']]['awayTeam']}\n\n"
+
+                    embed = self.show_h2h(jornada, position, embed)
+                    joker = bet["joker"]
+                    embed.add_field(name = "Jornada", value = f"`{jornada['id_jornada']}`", inline = False)
+                    embed.add_field(name = "Joker", value = f"`{joker['id_jogo']}`")
+
+                    await message.author.send(embed = embed)
                     database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id} , { "$set" : {"current" : jornada["jogos"][position["index"]]["id_jogo"]}})
                     message = await message.author.send(f":soccer: {jornada['jogos'][position['index']]['id_jogo']}: {jornada['jogos'][position['index']]['homeTeam']} - {jornada['jogos'][position['index']]['awayTeam']}")
                     return
@@ -202,9 +215,7 @@ class Aposta(commands.Cog):
                         embed = discord.Embed(title = "Aposta", colour = discord.Colour.green())
                         embed.set_thumbnail(url = message.author.avatar_url)
                         
-                        embed.description = f"**{jornada['jogos'][position['index']]['homeTeam']} `{result[0]}-{result[1]}` {jornada['jogos'][position['index']]['awayTeam']}**\n\n \
-                                        **Próximo jogo:**\n:soccer:`{jornada['jogos'][position['index'] + 1]['id_jogo']}`: {jornada['jogos'][position['index'] + 1]['homeTeam']} - \
-                                        {jornada['jogos'][position['index'] + 1]['awayTeam']}\n\n"
+                        embed.description = f"**{jornada['jogos'][position['index']]['homeTeam']} `{result[0]}-{result[1]}` {jornada['jogos'][position['index']]['awayTeam']}**\n\n**Próximo jogo:**\n:soccer:`{jornada['jogos'][position['index'] + 1]['id_jogo']}`: {jornada['jogos'][position['index'] + 1]['homeTeam']} - {jornada['jogos'][position['index'] + 1]['awayTeam']}\n\n"
 
                         embed = self.show_h2h(jornada, position, embed)
                         
@@ -289,14 +300,15 @@ class Aposta(commands.Cog):
 
         str_jogos = "\n"
         for j, jogo in enumerate(jornada["jogos"]):
-            str_jogos += f":soccer: `{jogo['id_jogo']}`: **{jogo['homeTeam']}** `{bet['apostas'][j]['resultado'][: bet['apostas'][j]['resultado'].index('-')]}-{bet['apostas'][j]['resultado'][bet['apostas'][j]['resultado'].index('-')+1 :]}` **{jogo['awayTeam']}**\n"
+            if bet["apostas"][j]["resultado"] is not None:
+                str_jogos += f":soccer: `{jogo['id_jogo']}`: **{jogo['homeTeam']}** `{bet['apostas'][j]['resultado'][: bet['apostas'][j]['resultado'].index('-')]}-{bet['apostas'][j]['resultado'][bet['apostas'][j]['resultado'].index('-')+1 :]}` **{jogo['awayTeam']}**\n"
 
         embed = discord.Embed(title = "Aposta", colour = discord.Colour.dark_theme())
         embed.add_field(name = "ID", value = jornada["id_jornada"])
         embed.add_field(name = "Joker", value = bet["joker"]["id_jogo"])
         embed.description = str_jogos
         embed.set_thumbnail(url = user.avatar_url)
-        embed.set_footer(text = "Totobola Discordiano", icon_url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
+        embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
 
         await channel.send(embed = embed)
     

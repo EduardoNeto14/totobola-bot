@@ -4,12 +4,15 @@ import pymongo
 import sys
 import json
 import asyncio
+import re
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
+logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
 
 sys.path.append(f"{PATH}/utils")
 
 from utils import is_admin, is_comp, is_comp_not
+from results import calculate
 
 async def database_exists(ctx):
     database = pymongo.MongoClient(port = 27017)
@@ -43,8 +46,8 @@ class Totobola(commands.Cog):
 
         # TODO : Melhorar mensagem #
         embed = discord.Embed(title = "Registo", colour = discord.Colour.dark_gold())
-        embed.set_thumbnail(url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
-        embed.description = f"Para te registares na prova, basta clicares no :writing_hand:.\n"
+        embed.set_thumbnail(url = logo)
+        embed.description = f"Para te registares na prova, basta clicares no :writing_hand:.\n\n*Utiliza o comando td!canal para anexares o bot a um canal!*\n"
         embed.set_footer(text = "Totobola Discordiano")
 
         message = await ctx.send(embed = embed)
@@ -56,6 +59,8 @@ class Totobola(commands.Cog):
             "message_id" : message.id
         })
 
+        await ctx.invoke(self.client.get_command("canal"))
+
     @commands.command(brief = "**Adiciona um administrador!**", description = "**Utilização:** `td!admin [jogador]`")
     @commands.check(is_admin)
     async def admin(self, ctx, mention):
@@ -66,7 +71,7 @@ class Totobola(commands.Cog):
         properties.update_one({"_id" : p["_id"]}, {"$push" : {"admin" : ctx.message.mentions[0].id}})
 
         embed = discord.Embed(title="Administrador", colour = discord.Colour.magenta())
-        embed.set_footer(text = "Totobola Discordiano", icon_url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
+        embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
         embed.set_thumbnail(url = ctx.message.mentions[0].avatar_url)
         embed.add_field(name = "Admin", value = f"```{ctx.message.mentions[0].display_name}```")
         embed.add_field(name = "Estado", value = "```Ativo```")
@@ -81,7 +86,7 @@ class Totobola(commands.Cog):
         database["totobola"]["properties"].update(database["totobola"]["properties"].find_one({}, {"_id": 1}), {"$push" : {"competicoes" : {"competicao" : comp, "link" : None, "name" : None}}})
 
         for player in database["totobola"]["jogadores"].find({} , {"player_id" : 1, "_id" : 0}):
-            database["totobola"][comp].insert_one({"player_id" : player["player_id"], "pontuacao" : 0, "apostas" : 0})
+            database["totobola"][comp].insert_one({"player_id" : player["player_id"], "pontuacao" : 0, "apostas" : 0, "vitorias" : 0})
             database["totobola"]["total"].update_one({"player_id" : player["player_id"]}, {"$push" : {"p_competicoes" : {"competicao" : comp, "pontuacao" : 0 }}})
 
         await ctx.send(f":trophy: **Competição {comp} adicionada com sucesso!**")
@@ -148,7 +153,7 @@ class Totobola(commands.Cog):
         data_to_send = ""
         for c, command in enumerate(self.client.commands):
             if c >= start*per_page and c < start*per_page + per_page:
-                data_to_send += f":reminder_ribbon:\t\t{command.name}\n{command.brief}\n{command.description}\n\n"
+                data_to_send += f":reminder_ribbon:\t\ttd!{command.name}\n{command.brief}\n{command.description}\n\n"
         
         embed = discord.Embed(title = "Comandos", colour = discord.Colour.lighter_grey())
         embed.description = data_to_send
@@ -169,7 +174,7 @@ class Totobola(commands.Cog):
             return True if user != self.client.user and str(reaction.emoji) in ['⏪', '⏩'] and reaction.message.id == msg.id else False
 
         try:
-            reaction, user = await self.client.wait_for("reaction_add", timeout = 60, check = check)
+            reaction, user = await self.client.wait_for("reaction_add", timeout = 120, check = check)
         except asyncio.TimeoutError:
             pass
 
@@ -180,6 +185,58 @@ class Totobola(commands.Cog):
                 await self.pages(ctx=ctx, msg=msg, start=start-1, per_page=per_page, max=max)
             elif reaction.emoji == '⏩' and start < max - 1:
                 await self.pages(ctx=ctx, msg=msg, start=start+1, per_page=per_page, max=max)
+
+    # TODO:
+    @commands.command(brief = "**Cancela um jogo!**", description = "**Utilização:** `td!cancel [id jogo]`")
+    @commands.check( is_admin )
+    async def cancel(self, ctx, id_jogo):
+        database = pymongo.MongoClient(port = 27017)
+
+        jornada = database["totobola"]["jornadas"].find_one_and_update( {"jornada" : "ATIVA", "jogos.id_jogo" : id_jogo},
+                                                                        {"jogos.$.estado" : "PROCESSED", "$unset" : {"jogos.$.h2hHome" : 1, "jogos.$.h2hAway" : 1}},
+                                                                        projection = {"id_jornada" : 1})
+        
+        if jornada is not None:
+            print(jornada["id_jornada"])
+
+            if (database["totobola"]["jornadas"].count_documents({"id_jornada" : jornada["id_jornada"], "jogos" : {"$elemMatch" : {"estado" : {"$ne" : "PROCESSED"}}}}) == 0):
+                database["totobola"]["jornadas"].update_one( { "id_jornada" : jornada["id_jornada"] },
+                                                             {"$set" : {"estado" : "TERMINADA"}} )
+                                                             #verificar se todos os jogos estão processed e, se sim, terminar jornada.
+
+        else:
+            await ctx.send(":x: **Jogo não encontrado!**")
+    
+    # TODO:
+    @commands.command(brief = "**Atribui um resultado a um jogo!**", description = "**Utilização:** `td!resultado [id_jogo] [resultado]`")
+    @commands.check( is_admin )
+    async def resultado(self, ctx, id_jogo, resultado):
+        database = pymongo.MongoClient(port = 27017)
+
+        if database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA", "jogos.id_jogo" : int(id_jogo)}) > 0: 
+        
+            if len(re.findall(r'\d+', resultado.lower())) == 2:
+                print("Resultado!")
+                res = re.findall(r'\d+', resultado.lower())
+
+                game = {
+                    "id" : int(id_jogo),
+                    "score" : {
+                        "winner" : None,
+                        "fullTime" : {
+                            "homeTeam" : res[0],
+                            "awayTeam" : res[1]
+                        }
+                    }
+                }
+
+                if (res[0] > res[1]) : game["score"]["winner"] = "HOME_TEAM"
+                elif (res[0] < res[1]) : game["score"]["winner"] = "AWAY_TEAM"
+                else : game["score"]["winner"] = "DRAW"
+
+                await calculate(game, self.client)
+        else:
+            await ctx.send(":x: **Jogo não encontrado!**")
 
 def setup(client):
     client.add_cog(Totobola(client))

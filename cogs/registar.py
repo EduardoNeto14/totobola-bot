@@ -6,6 +6,7 @@ import json
 import sys
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
+logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
 
 sys.path.append(f"{PATH}/utils")
 
@@ -33,15 +34,15 @@ class Registar(commands.Cog):
                     
                     n_comps = []
                     for competicao in database["totobola"]["properties"].find_one()["competicoes"]:
-                        database["totobola"][f"{competicao['competicao']}"].insert_one({"player_id" : user.id, "pontuacao" : 0})
-                        n_comps.append({"competicao" : competicao['competicao'], "pontuacao" : 0, "apostas" : 0})
+                        database["totobola"][f"{competicao['competicao']}"].insert_one({"player_id" : user.id, "pontuacao" : 0, "apostas" : 0, "vitorias" : 0})
+                        n_comps.append({"competicao" : competicao['competicao'], "pontuacao" : 0})
 
                     database["totobola"]["total"].insert_one({"player_id": user.id, "p_competicoes" : n_comps, "pontuacao" : 0}) 
                     
                     # TODO: Melhorar mensagem #
                     embed = discord.Embed(title="Registo", colour = discord.Colour.dark_green())
                     embed.set_thumbnail(url = user.avatar_url)
-                    embed.set_footer(text = "Totobola Discordiano", icon_url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
+                    embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
                     embed.add_field(name = "**Estado**", value = "`Registado`")
                     embed.add_field(name = "**Nome**", value = f"`{user.display_name}`")
                     embed.description = "Muito obrigado por participares! \n\nBoa sorte!"
@@ -69,7 +70,7 @@ class Registar(commands.Cog):
 
         # TODO: Melhorar mensagem #
         embed = discord.Embed(title = "Registo", colour = discord.Colour.dark_gold())
-        embed.set_thumbnail(url = "https://media.discordapp.net/attachments/786651440528883745/788119312489381928/totoo.png")
+        embed.set_thumbnail(url = logo)
         embed.description = "Para te registares na prova, basta clicares no :writing_hand:."
         embed.set_footer(text = "Totobola Discordiano")
          
