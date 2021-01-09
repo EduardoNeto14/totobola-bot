@@ -3,6 +3,8 @@ from discord.ext import commands
 import pymongo
 import asyncio
 
+logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
+
 class Info(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -198,10 +200,10 @@ class Info(commands.Cog):
     async def geraldes(self, ctx):
         database = pymongo.MongoClient(port = 27017)
         
-        if "vencedores" not in database["totobola"].list_collection_names():
+        if "geraldes" not in database["totobola"].list_collection_names():
             await ctx.send(":x: **Não existem vencedores registados!**")
         else:
-            await self.win_pages()
+            await self.win_pages(ctx)
 
     async def pont_pages(self, ctx, id_jornada, msg = None, start = 0, per_page = 10, max = None):
         database = pymongo.MongoClient(port = 27017)
@@ -259,11 +261,71 @@ class Info(commands.Cog):
             elif reaction.emoji == '⏩' and start < max - 1:
                 await self.pont_pages(ctx=ctx, id_jornada=id_jornada, msg=msg, start=start+1, per_page=per_page, max=max)
 
-    async def win_pages(self, msg = None, start = 0, per_page = 5, max = None):
+    async def win_pages(self, ctx, msg = None, start = 0, per_page = 5, max = None):
         database = pymongo.MongoClient(port = 27017)
 
         if max is None:
             max = int(database["totobola"]["geraldes"].count_documents({}) / per_page) + 1
+
+        # FALTA A QUERY
+        winners = database["totobola"]["geraldes"].aggregate([
+            { "$unwind" : { "path" : "$vencedores", "preserveNullAndEmptyArrays" : True}},
+            { "$lookup" : {
+                "from" : "jogadores",
+                "localField" : "vencedores",
+                "foreignField" : "player_id",
+                "as" : "vencedores"
+            }},
+            { "$sort" : {
+                "pontuacao" : 1
+            }},
+            { "$limit" : per_page},
+            { "$skip" : start*per_page}
+        ])
+        
+        data_to_send = ""
+        for winner in winners:
+            data_to_send += f":trophy: `{winner['id_jornada']}`\t\t-\t\t:dart:**Pontuação:** `{winner['pontuacao']['pontuacao']}`\n\n"
+
+            for vencedor in winner["vencedores"]:
+                data_to_send += f":first_place: **{vencedor['player_name']}**\n"
+
+            data_to_send += "\n"
+
+        embed = discord.Embed(title = "Vencedores", colour = discord.Colour.dark_red())
+        embed.description = data_to_send
+        embed.set_thumbnail(url = logo)
+        embed.set_footer(text = "Totobola Discordiano")
+        
+        if msg is not None:
+            await msg.edit(embed=embed)
+            if not isinstance(msg.channel, discord.abc.PrivateChannel):
+                await msg.clear_reactions()
+        else:
+            msg = await ctx.send(embed=embed)
+        
+        if start > 0:
+            await msg.add_reaction('⏪')
+        if start < max - 1:
+            await msg.add_reaction('⏩')
+
+        # wait for reactions (2 minutes)
+        def check(reaction, user):
+            return True if user != self.client.user and str(reaction.emoji) in ['⏪', '⏩'] and reaction.message.id == msg.id else False
+        
+        try:
+            reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
+        except asyncio.TimeoutError:
+            pass
+        
+        else:
+            # redirect on reaction
+            if reaction is None:
+                return
+            elif reaction.emoji == '⏪' and start > 0:
+                await self.win_pages(ctx=ctx, msg=msg, start=start-1, per_page=per_page, max=max)
+            elif reaction.emoji == '⏩' and start < max - 1:
+                await self.win_pages(ctx=ctx, msg=msg, start=start+1, per_page=per_page, max=max)
     
     @commands.command(brief = "**Mostra a pontuação de uma jornada!**", description = "**Utilização:** `td!pontuacao [id jornada]`")
     async def pontuacao(self, ctx, id_jornada):
