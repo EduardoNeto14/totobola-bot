@@ -12,7 +12,7 @@ logo = "https://cdn.discordapp.com/attachments/786651440528883745/79711479495170
 sys.path.append(f"{PATH}/utils")
 
 from utils import is_admin, is_comp, is_comp_not
-from results import calculate
+from results import calculate, finish_matchday
 
 async def database_exists(ctx):
     database = pymongo.MongoClient(port = 27017)
@@ -192,18 +192,19 @@ class Totobola(commands.Cog):
     async def cancel(self, ctx, id_jogo):
         database = pymongo.MongoClient(port = 27017)
 
-        jornada = database["totobola"]["jornadas"].find_one_and_update( {"jornada" : "ATIVA", "jogos.id_jogo" : id_jogo},
-                                                                        {"jogos.$.estado" : "PROCESSED", "$unset" : {"jogos.$.h2hHome" : 1, "jogos.$.h2hAway" : 1}},
+        jornada = database["totobola"]["jornadas"].find_one_and_update( {"estado" : "ATIVA", "jogos.id_jogo" : int(id_jogo)},
+                                                                        {"$set" : {"jogos.$.estado" : "PROCESSED"}, "$unset" : {"jogos.$.h2hHome" : 1, "jogos.$.h2hAway" : 1}},
                                                                         projection = {"id_jornada" : 1})
-        
+
         if jornada is not None:
             print(jornada["id_jornada"])
+            
+            database["totobola"][jornada["id_jornada"]].update_many({"joker.id_jogo" : int(id_jogo)}, {"$set" : {"joker.processed" : 0}})
 
             if (database["totobola"]["jornadas"].count_documents({"id_jornada" : jornada["id_jornada"], "jogos" : {"$elemMatch" : {"estado" : {"$ne" : "PROCESSED"}}}}) == 0):
-                database["totobola"]["jornadas"].update_one( { "id_jornada" : jornada["id_jornada"] },
-                                                             {"$set" : {"estado" : "TERMINADA"}} )
-                                                             #verificar se todos os jogos estão processed e, se sim, terminar jornada.
-
+                await finish_matchday(self.client, jornada)
+            else:
+                await ctx.send(":x: **Jogo cancelado com sucesso!**")
         else:
             await ctx.send(":x: **Jogo não encontrado!**")
     

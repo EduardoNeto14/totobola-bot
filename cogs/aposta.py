@@ -313,21 +313,18 @@ class Aposta(commands.Cog):
 
         await channel.send(embed = embed)
     
-    def send_bet(self, user, competicao):
+    def send_bet(self, user, jornada):
             database = pymongo.MongoClient(port = 27017)
-            jornada = database["totobola"]["jornadas"].find_one({"competicao" : competicao, "estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
                     
             if jornada is not None:
-                bet = database["totobola"][jornada["id_jornada"]].find_one({"player_id" : user.id, "estado" : {"$ne" : "TERMINADA"}}, {"_id" : 0, "apostas" : 1, "joker" : 1, "pontuacao" : 1})
+                bet = database["totobola"][jornada["id_jornada"]].find_one({"player_id" : user.id, "status" : {"$ne" : "INATIVA"}}, {"_id" : 0, "apostas" : 1, "joker" : 1, "pontuacao" : 1})
                 
-                print(bet)
-
                 if bet is not None:
                     embed = discord.Embed(title = "Aposta", colour = discord.Colour.dark_blue())
                     embed.set_thumbnail(url = user.avatar_url)
                     embed.add_field(name = "Jogador", value = user.display_name)
                     embed.add_field(name = "Pontuação", value = bet["pontuacao"])
-
+                    embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
                     games = ""
 
                     for j, jogo in enumerate(bet["apostas"]):
@@ -351,8 +348,11 @@ class Aposta(commands.Cog):
     
     @commands.command(brief = "**Verificar aposta numa jornada ativa de uma competição!**", description ="**Utilização:** `td!aposta [competicao] (jogador)`")
     async def aposta(self, ctx, competicao, *args):
+        database = pymongo.MongoClient(port = 27017)
+        jornada = database["totobola"]["jornadas"].find_one({"competicao" : competicao, "estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
+        
         if len(args) == 0:
-            embed = self.send_bet(ctx.author, competicao)
+            embed = self.send_bet(ctx.author, jornada)
             if embed not in [-1, -2]:
                 await ctx.send(embed = embed)
             elif embed == -1:
@@ -362,7 +362,7 @@ class Aposta(commands.Cog):
 
         elif len(args) == 1:
             if ctx.message.mentions is not None:
-                embed = self.send_bet(ctx.message.mentions[0], competicao)
+                embed = self.send_bet(ctx.message.mentions[0], jornada)
                 if embed not in [-1, -2]:
                     await ctx.send(embed = embed)
                 elif embed == -1:
@@ -375,9 +375,34 @@ class Aposta(commands.Cog):
         else:
             await ctx.send("Demasiados argumentos. O comando deve ser utilizado da seguinte forma: **td!aposta [competição] @(opcional)**")
 
-    @commands.command(brief = "**Verificar aposta em jornadas terminadas!**", description = "**Utilização:** `td!apostada [id jornada]`")
-    async def apostada(self, ctx, id_jornada):
+    @commands.command(brief = "**Verificar aposta em jornadas terminadas!**", description = "**Utilização:** `td!apostada [id jornada] (jogador)`")
+    async def apostada(self, ctx, id_jornada, *args):
         database = pymongo.MongoClient(port = 27017)
+        jornada = database["totobola"]["jornadas"].find_one({"id_jornada" : id_jornada, "estado" : "TERMINADA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
+        
+        if len(args) == 0:
+            embed = self.send_bet(ctx.author, jornada)
+            if embed not in [-1, -2]:
+                await ctx.send(embed = embed)
+            elif embed == -1:
+                await ctx.send("**Jornada não encontrada!**")
+            elif embed == -2:
+                await ctx.send("**Jogador não apostou na jornada!**")
+
+        elif len(args) == 1:
+            if ctx.message.mentions is not None:
+                embed = self.send_bet(ctx.message.mentions[0], jornada)
+                if embed not in [-1, -2]:
+                    await ctx.send(embed = embed)
+                elif embed == -1:
+                    await ctx.send("**Jornada não encontrada!**")
+                elif embed == -2:
+                    await ctx.send("**Jogador não apostou na jornada!**")
+
+            else:
+                await ctx.send("**Precisas de mencionar alguém!**")
+        else:
+            await ctx.send("Demasiados argumentos. O comando deve ser utilizado da seguinte forma: **td!aposta [competição] @(opcional)**")
         
 def setup(client):
     client.add_cog(Aposta(client))

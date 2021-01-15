@@ -130,7 +130,9 @@ class Jornada(commands.Cog):
                         jornada["link"] = list(link)
 
                         database["totobola"]["jornadas"].insert_one(jornada)
-                        await ctx.invoke(self.client.get_command("jogos"), ctx = ctx, competicao = comp)
+
+                        await ctx.send(f"**Utilize** `td!jogos {comp}` **para ver os jogos da jornada!**")
+                        
                         await self.send_to_players(database, jornada)
             
             if self.task is None:
