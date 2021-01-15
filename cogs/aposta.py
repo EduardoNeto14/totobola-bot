@@ -308,6 +308,7 @@ class Aposta(commands.Cog):
         embed.add_field(name = "Joker", value = bet["joker"]["id_jogo"])
         embed.description = str_jogos
         embed.set_thumbnail(url = user.avatar_url)
+        embed.add_field(name = "Jogador", value = f"`{user.display_name}`")
         embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
 
         await channel.send(embed = embed)

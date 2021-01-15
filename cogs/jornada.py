@@ -130,6 +130,7 @@ class Jornada(commands.Cog):
                         jornada["link"] = list(link)
 
                         database["totobola"]["jornadas"].insert_one(jornada)
+                        await ctx.invoke(self.client.get_command("jogos"), ctx = ctx, competicao = comp)
                         await self.send_to_players(database, jornada)
             
             if self.task is None:
@@ -259,11 +260,13 @@ class Jornada(commands.Cog):
         embed.add_field(name = "ID", value = jornada["id_jornada"])
         embed.description = jogos + "\n\n" + "Para postar basta clicar em :page_facing_up:"
         embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
-        
-        for _user in database["totobola"]["jogadores"].find({}, {"_id" : 0}):
-            user = await self.client.fetch_user(_user["player_id"])
+
+        jogadores = database["totobola"]["jogadores"].find({}, {"_id" : 0})
+        for player in jogadores:
+            user = await self.client.fetch_user(player["player_id"])
             
-            jogador["player_id"] = _user["player_id"] 
+            jogador_copy = jogador.copy()
+            jogador_copy["player_id"] = player["player_id"] 
             
             embed.set_thumbnail(url = user.avatar_url)
             
@@ -272,8 +275,8 @@ class Jornada(commands.Cog):
             await message.add_reaction("📄")
             await message.pin()
 
-            jogador["message_id"] = message.id 
-            database["totobola"][jornada["id_jornada"]].insert_one(jogador)
+            jogador_copy["message_id"] = message.id 
+            database["totobola"][jornada["id_jornada"]].insert_one(jogador_copy)
 
 def setup(client):
     client.add_cog(Jornada(client))

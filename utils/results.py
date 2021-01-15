@@ -8,6 +8,21 @@ api_to_db = {
     "DRAW" : "draw"
 }
 
+ranking_teams = [
+    25,
+    20,
+    18,
+    15,
+    10,
+    5,
+    4,
+    3,
+    2,
+    1
+]
+
+TOP = 10
+
 logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
 
 async def calculate(game, client):
@@ -58,8 +73,26 @@ async def calculate(game, client):
                                                      {"$set" : {"estado" : "TERMINADA"}} )
         
         # Calcular cena de equipa
-        # Calcular vencedores
+        pontuacoes = database["totobola"][jornada["id_jornada"]].find({"estado" : {"$ne" : "INATIVA"}}, {"_id" : 0, "player_id" : 1, "pontuacao" : 1})
 
+        position = 1
+        last_pont = None
+
+        for p, pontuacao in enumerate(pontuacoes):
+            
+            if position > TOP:
+                break
+
+            if last_pont is None:
+                last_pont = pontuacao["pontuacao"]
+            elif last_pont != pontuacao["pontuacao"]:
+                position = p + 1
+            
+            team_id = database["totobola"]["jogadores"].find_one({"player_id" : pontuacao["player_id"]}, {"_id" : 0, "team_id" : 1})["team_id"]
+
+            if team_id is not None:
+                database["totobola"]["teams"].update_one({"team_id" : team_id}, {"$inc" : {"pontuacao" : ranking_teams[position - 1]}})
+        
         channel = database["totobola"]["properties"].find_one({}, {"_id" : 0, "channel" : 1})
         channel = client.get_channel(channel["channel"])
 
@@ -73,11 +106,13 @@ async def calculate(game, client):
             data_to_send += f"**{jogo['homeTeam']}** `{jogo['resultado']}` **{jogo['awayTeam']}**\n"
         
         data_to_send += f"\n*Utilize `td!pontuacao {jornada['id_jornada']}` para verificar a pontuação!*"
-        embed.description = data_to_send
         embed.set_thumbnail(url = logo)
 
         maximum = database["totobola"][jornada["id_jornada"]].find_one({}, {"_id": 0, "pontuacao" : 1}, sort = [("pontuacao", pymongo.DESCENDING)], limit = 1)
+        print(maximum)
+
         vencedores = database["totobola"][jornada["id_jornada"]].find({"pontuacao" : {"$gte" : maximum["pontuacao"]}}, {"_id": 0, "pontuacao" : 1, "player_id" : 1})
+        print(vencedores)
 
         winners = []
 
@@ -88,10 +123,33 @@ async def calculate(game, client):
         winners = {
             "id_jornada" : jornada["id_jornada"],
             "vencedores" : winners,
-            "pontuacao" : maximum
+            "pontuacao" : maximum["pontuacao"]
         }
         
         database["totobola"]["geraldes"].insert_one(winners)
+
+        vencedores = database["totobola"]["geraldes"].aggregate([
+            {"$match" : {"id_jornada" : jornada["id_jornada"]}},
+            { "$unwind" : { "path" : "$vencedores", "preserveNullAndEmptyArrays" : True}},
+            { "$lookup" : {
+                "from" : "jogadores",
+                "localField" : "vencedores",
+                "foreignField" : "player_id",
+                "as" : "vencedores"
+            }},
+            {"$project" : {
+                "vencedores.player_name" : 1
+            }}
+        ])
+
+        str_winners = ""
+        for vencedor in vencedores:
+            str_winners += f"**{vencedor['vencedores'][0]['player_name']}**"
+        
+        embed.description = data_to_send
+        
+        embed.add_field(name = "Vencedores", value = str_winners)
+        embed.add_field(name = "Pontuação", value = f"`{maximum}`")
 
         await channel.send(embed = embed)
         

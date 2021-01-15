@@ -14,10 +14,18 @@ class Info(commands.Cog):
         database = pymongo.MongoClient(port = 27017)
 
         if len(args) > 0 and len(ctx.message.mentions) > 0:
-            embed = discord.Embed(title = "Informação do Jogador", colour = discord.Colour.dark_purple())  # TODO: alterar cor consoante a equipa
+            team_id = database["totobola"]["jogadores"].find_one({"player_id" : ctx.message.mentions[0].id}, {"_id" : 0, "team_id" : 1})["team_id"]
+            
+            team = None
+            
+            if team_id is not None:
+                team = database["totobola"]["teams"].find_one({"team_id" : team_id}, {"_id" : 0, "name" : 1, "pontuacao" : 1, "color" : 1})
+                embed = discord.Embed(title = "Informação do Jogador", colour = team["color"])  # TODO: alterar cor consoante a equipa
+
+            else:
+                embed = discord.Embed(title = "Informação do Jogador", colour = discord.Colour.dark_purple())  # TODO: alterar cor consoante a equipa
+            
             competicoes = database["totobola"]["properties"].find_one({}, {"_id" : 0, "competicoes.competicao" : 1})
-            print(competicoes)
-            # Ir buscar team id e cor, se tiver equipa
             # Verificar posição com count_documents e $gt
             # Set footer
             data_to_send = ""
@@ -36,17 +44,28 @@ class Info(commands.Cog):
                 position = database["totobola"]["total"].count_documents({"pontuacao" : {"$gt" : info["pontuacao"]}})
                 data_to_send += f"**Posição:** `{position + 1}º` **Pontuação:** `{competicoes['pontuacao']}\n\n`"
             
+            if team is not None:
+                data_to_send += f":trophy: **Equipa:** `{team['name']}` **Pontuação:** `{team['pontuacao']}`\n"
+
             embed.description = data_to_send
             embed.add_field(name = "Jogador", value = f"`{ctx.message.mentions[0].display_name}`")
             embed.set_thumbnail(url = ctx.message.mentions[0].avatar_url)
-            
+            embed.set_footer(text = "Totobola Discordiano", icon_url = logo) 
             await ctx.send(embed = embed)
 
         elif len(args) == 0:
-            embed = discord.Embed(title = "Informação do Jogador", colour = discord.Colour.dark_purple())  # TODO: alterar cor consoante a equipa
+            team_id = database["totobola"]["jogadores"].find_one({"player_id" : ctx.message.author.id}, {"_id" : 0, "team_id" : 1})["team_id"]
+            
+            team = None
+            
+            if team_id is not None:
+                team = database["totobola"]["teams"].find_one({"team_id" : team_id}, {"_id" : 0, "name" : 1, "pontuacao" : 1, "color" : 1})
+                embed = discord.Embed(title = "Informação do Jogador", colour = team["color"])  # TODO: alterar cor consoante a equipa
+
+            else:
+                embed = discord.Embed(title = "Informação do Jogador", colour = discord.Colour.dark_purple())  # TODO: alterar cor consoante a equipa
+
             competicoes = database["totobola"]["properties"].find_one({}, {"_id" : 0, "competicoes.competicao" : 1})
-            print(competicoes)
-            # Ir buscar team id e cor, se tiver equipa
             # Set footer
             data_to_send = ""
             for comp in competicoes["competicoes"]:
@@ -64,9 +83,13 @@ class Info(commands.Cog):
                 position = database["totobola"]["total"].count_documents({"pontuacao" : {"$gt" : info["pontuacao"]}})
                 data_to_send += f"**Posição:** `{position + 1}º` **Pontuação:** `{competicoes['pontuacao']}\n\n`"
                 
+            if team is not None:
+                data_to_send += f":trophy: **Equipa:** `{team['name']}` **Pontuação:** `{team['pontuacao']}`\n"
+            
             embed.description = data_to_send
             embed.add_field(name = "Jogador", value = f"`{ctx.message.author.display_name}`")
             embed.set_thumbnail(url = ctx.message.author.avatar_url)
+            embed.set_footer(text = "Totobola Discordiano", icon_url = logo) 
 
             await ctx.send(embed = embed)
         else:
@@ -126,7 +149,7 @@ class Info(commands.Cog):
             players = database["totobola"][competicao].aggregate(
                 [{"$lookup" : 
                             { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
-                {"$sort" : {"pontuacao" : 1}},
+                {"$sort" : {"pontuacao" : -1}},
                 {"$unwind" : "$table"},
                 {"$project" :
                             { "player_id" : 1, "table.player_name" : 1, "pontuacao" : 1, "apostas" : 1}},
@@ -137,7 +160,7 @@ class Info(commands.Cog):
             players = database["totobola"][competicao].aggregate(
                 [{"$lookup" : 
                             { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
-                {"$sort" : {"pontuacao" : 1}},
+                {"$sort" : {"pontuacao" : -1}},
                 {"$unwind" : "$table"},
                 {"$project" :
                             { "player_id" : 1, "table.player_name" : 1, "pontuacao" :1}},
@@ -185,7 +208,7 @@ class Info(commands.Cog):
         try:
             reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
         except asyncio.TimeoutError:
-            pass
+            await msg.delete()
         
         else:
             # redirect on reaction
@@ -209,12 +232,12 @@ class Info(commands.Cog):
         database = pymongo.MongoClient(port = 27017)
 
         if max is None:
-            max = int(database["totobola"][id_jornada].count_documents({}))
+            max = int(database["totobola"][id_jornada].count_documents({}) / per_page) + 1
 
         players = database["totobola"][id_jornada].aggregate(
             [{"$lookup" : 
                         { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
-            {"$sort" : {"pontuacao" : 1}},
+            {"$sort" : {"pontuacao" : -1}},
             {"$unwind" : "$table"},
             {"$project" :
                         { "player_id" : 1, "table.player_name" : 1, "pontuacao" : 1}},
@@ -250,7 +273,7 @@ class Info(commands.Cog):
         try:
             reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
         except asyncio.TimeoutError:
-            pass
+            await msg.delete()
         
         else:
             # redirect on reaction
@@ -277,7 +300,7 @@ class Info(commands.Cog):
                 "as" : "vencedores"
             }},
             { "$sort" : {
-                "pontuacao" : 1
+                "pontuacao" : -1
             }},
             { "$limit" : per_page},
             { "$skip" : start*per_page}
@@ -285,7 +308,7 @@ class Info(commands.Cog):
         
         data_to_send = ""
         for winner in winners:
-            data_to_send += f":trophy: `{winner['id_jornada']}`\t\t-\t\t:dart:**Pontuação:** `{winner['pontuacao']['pontuacao']}`\n\n"
+            data_to_send += f":trophy: `{winner['id_jornada']}`\t\t-\t\t:dart:**Pontuação:** `{winner['pontuacao']}`\n\n"
 
             for vencedor in winner["vencedores"]:
                 data_to_send += f":first_place: **{vencedor['player_name']}**\n"
@@ -316,7 +339,7 @@ class Info(commands.Cog):
         try:
             reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
         except asyncio.TimeoutError:
-            pass
+            await msg.delete()
         
         else:
             # redirect on reaction
