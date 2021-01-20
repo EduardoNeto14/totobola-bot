@@ -2,16 +2,28 @@ import discord
 from discord.ext import commands
 import pymongo
 import asyncio
+import logging
 
 logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
 
 class Info(commands.Cog):
     def __init__(self, client):
         self.client = client
+        self.logger = logging.getLogger(__name__)
+        
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s")
+        
+        file_handler = logging.FileHandler("logs/info.log")
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.INFO)
 
+        self.logger.addHandler(file_handler)
+    
     @commands.command(brief = "**Informação sobre um jogador!**", description = "**Utilização:** `td!player (jogador)`")
     async def player(self, ctx, *args):
         database = pymongo.MongoClient(port = 27017)
+
+        self.logger.info(f"\n[player] {ctx.message.author.display_name} - Args: [{args}]!")
 
         if len(args) > 0 and len(ctx.message.mentions) > 0:
             team_id = database["totobola"]["jogadores"].find_one({"player_id" : ctx.message.mentions[0].id}, {"_id" : 0, "team_id" : 1})["team_id"]
@@ -20,15 +32,15 @@ class Info(commands.Cog):
             
             if team_id is not None:
                 team = database["totobola"]["teams"].find_one({"team_id" : team_id}, {"_id" : 0, "name" : 1, "pontuacao" : 1, "color" : 1})
-                embed = discord.Embed(title = "Informação do Jogador", colour = team["color"])  # TODO: alterar cor consoante a equipa
+                embed = discord.Embed(title = "Informação do Jogador", colour = team["color"])
 
             else:
-                embed = discord.Embed(title = "Informação do Jogador", colour = discord.Colour.dark_purple())  # TODO: alterar cor consoante a equipa
+                embed = discord.Embed(title = "Informação do Jogador", colour = discord.Colour.dark_purple())
             
             competicoes = database["totobola"]["properties"].find_one({}, {"_id" : 0, "competicoes.competicao" : 1})
-            # Verificar posição com count_documents e $gt
-            # Set footer
+            
             data_to_send = ""
+            
             for comp in competicoes["competicoes"]:
                 info = database["totobola"][comp["competicao"]].find_one({"player_id" : ctx.message.mentions[0].id}, {"_id" : 0})
                 print(info)
@@ -93,7 +105,7 @@ class Info(commands.Cog):
 
             await ctx.send(embed = embed)
         else:
-            await ctx.send("meh")
+            await ctx.send(":x: **Precisas de mencionar alguém válido!**")
         pass
 
     @commands.command(brief = "**Mostra todas as jornadas de uma competição!**", description = "**Utilização:** `td!jornadas [competição]`")
@@ -290,7 +302,6 @@ class Info(commands.Cog):
         if max is None:
             max = int(database["totobola"]["geraldes"].count_documents({}) / per_page) + 1
 
-        # FALTA A QUERY
         winners = database["totobola"]["geraldes"].aggregate([
             { "$unwind" : { "path" : "$vencedores", "preserveNullAndEmptyArrays" : True}},
             { "$lookup" : {

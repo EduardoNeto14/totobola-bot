@@ -1,6 +1,7 @@
 import asyncio
 import pymongo
 import requests
+import logging
 
 from results import calculate
 
@@ -10,6 +11,16 @@ result_to_team = {
     "AWAY_TEAM": "awayTeam",
     "HOME_TEAM": "homeTeam"
 }
+
+logger = logging.getLogger(__name__)
+
+formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s")
+
+file_handler = logging.FileHandler("logs/info.log")
+file_handler.setFormatter(formatter)
+file_handler.setLevel(logging.INFO)
+
+logger.addHandler(file_handler)
 
 async def check_games(client):
     database = pymongo.MongoClient(port = 27017)
@@ -29,9 +40,9 @@ async def check_games(client):
         
         active_matchday = map(str, active_matchday)
         active_matchday = ",".join(active_matchday)
-        print(active_matchday)
-        #C Check if active_matchday len > 0
 
+        logger.info(f"\n\n[CHECKING API]\n\n")
+        logger.info(f"\n[Active Matchdays] {active_matchday}")
         with open(f"{PATH}/api-token.txt", "rb") as token:
             token = token.readline()
         
@@ -41,10 +52,10 @@ async def check_games(client):
         
         for match in request["matches"]:
             if match["status"] == "SCHEDULED":
-                print(f"{match['id']} -> SCHEDULED")
+                logger.info(f"{match['id']} -> SCHEDULED")
                 # Não tem que se fazer nada, pois o jogo ainda não começou
             elif match["status"] == "LIVE" or match["status"] == "IN_PLAY":
-                print(f"{match['id']} -> LIVE")
+                logger.info(f"{match['id']} -> LIVE")
                 # Atualizar o estado do jogo na base de dados, para que o jogo fique bloqueado
                 database["totobola"]["jornadas"].update({"jogos.id_jogo" : match["id"]}, {"$set" : {"jogos.$.estado" : "LIVE"}})
                 
@@ -56,15 +67,14 @@ async def check_games(client):
 
                 # Talvez atualizar resultado?
             elif match["status"] == "FINISHED":
-                print(f"{match['id']} -> FINISHED")
+                logger.info(f"{match['id']} -> FINISHED")
                 await calculate(match, client)
                 # Verificar se o jogo foi processado. Se sim, passar à frente. Se não, calcular pontos.
             else:
-                print(f"{match['id']} -> {match['status']}")
+                logger.warning(f"{match['id']} -> {match['status']}")
         
         if (database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA"})) == 0:
-            #calcular campeonato equipas
-            
+            logger.info(f"\n[DONE] No active matchdays!")
             active = False
         
         await asyncio.sleep(60)
@@ -73,11 +83,11 @@ async def get_h2h(match):
     with open(f"{PATH}/api-token.txt", "rb") as token:
         api_token = token.readline()
     
-    #/v2/teams/[id]/matches
+    logger.info(f"\n\n[CHECING H2H]\n\n")
     id_home = match["homeTeam"]["id"]
-    print(match["homeTeam"])
+    logger.info(match["homeTeam"])
     id_away = match["awayTeam"]["id"]
-    print(match["awayTeam"])
+    logger.info(match["awayTeam"])
     ids = [id_home, id_away]
     
     home = []
@@ -114,7 +124,8 @@ async def get_h2h(match):
 def get_jornada(code, n_jornada):
     with open(f"{PATH}/api-token.txt", "rb") as token:
         token = token.readline()
-    
+
+    logger.info(f"\n\n[CHECKING MATCHDAY] {code}\n\n") 
     request = requests.get(f"http://api.football-data.org/v2/competitions/{code}/matches",
                             params = {"matchday" : n_jornada, "status" : "SCHEDULED"},
                             headers = {"X-Auth-Token" : token}).json()
@@ -125,6 +136,7 @@ def get_num_jornada(code):
     with open(f"{PATH}/api-token.txt", "rb") as token:
         token = token.readline()
 
+    logger.info(f"\n\n[CHECKING MATCHDAY NUMBER] {code}\n\n") 
     request = requests.get(f"http://api.football-data.org/v2/competitions/{code}",
                             headers = {"X-Auth-Token" : token}).json()
 

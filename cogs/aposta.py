@@ -3,6 +3,7 @@ from discord.ext import commands
 import re
 import pymongo
 import sys
+import logging
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
 sys.path.append(f"{PATH}/utils/")
@@ -13,6 +14,15 @@ from utils import is_comp, is_comp_not
 class Aposta(commands.Cog):
     def __init__(self, client):
         self.client = client
+        self.logger = logging.getLogger(__name__)
+        
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s")
+        
+        file_handler = logging.FileHandler("logs/info.log")
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.INFO)
+
+        self.logger.addHandler(file_handler)
 
     @commands.Cog.listener()
     async def on_reaction_add( self, reaction: discord.Reaction, user: discord.User ):
@@ -26,11 +36,12 @@ class Aposta(commands.Cog):
 
         if database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA"}) == 0:
             await user.send(":pencil2: Não existem jornadas ativas!")
+            self.logger.warning(f"\n[on_reaction_add] {user.display_name} -> Nenhuma jornada ativa!")
             return
 
         jornadas = database["totobola"]["jornadas"].find({"estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1, "competicao" : 1})
         
-        if jornadas.count() == 0: return
+        #if jornadas.count() == 0: return
         
         jornada_ativa = False
         j = None
@@ -51,6 +62,7 @@ class Aposta(commands.Cog):
         
         if jornada_ativa:
             await user.send(":lock: Já tens uma jornada ativa! Termina a tua aposta...")
+            self.logger.warning(f"\n[on_reaction_add] {user.display_name} -> Tentou iniciar uma aposta com outra ativa!")
             return
         
         position = database["totobola"]["jornadas"].aggregate( [ { "$match" : {"id_jornada" : j["id_jornada"]}}, 
@@ -80,9 +92,11 @@ class Aposta(commands.Cog):
             
             database["totobola"][j["id_jornada"]].update({"player_id" : user.id}, {"$set" : {"current" : j["jogos"][position["index"]]['id_jogo'], "status" : "ATIVA"}})
             database["totobola"][j["competicao"]].update_one({"player_id" : user.id}, {"$inc" : {"apostas" : 1}})
+
+            self.logger.info(f"\n[on_reaction_add] {user.display_name} -> Iniciou jornada {j['id_jornada']}")
             
         except StopIteration:
-            print("[Jornada - Erro] Posição não encontrada!")
+            self.logger.error(f"\n[on_reaction_add] {user.display_name} -> Nenhum jogo ativo!")
     
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -97,6 +111,7 @@ class Aposta(commands.Cog):
             ''' Check if there are active matchdays '''
             if database["totobola"]["jornadas"].count_documents({"estado" : "ATIVA"}) == 0:
                 await message.author.send(":pencil2: Não existem jornadas ativas!")
+                self.logger.warning(f"\n[on_message] {message.author.display_name} -> Não existe uma jornada ativa!")
                 return
 
             jornadas = database["totobola"]["jornadas"].find({"estado" : "ATIVA"}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
@@ -117,6 +132,7 @@ class Aposta(commands.Cog):
             ''' If there isn't an active bet, just return '''
             if bet is None:
                 await message.author.send(":pencil2: Tens que ativar a jornada antes de apostares!")
+                self.logger.warning(f"\n[on_message] {message.author.display_name} -> Não tem nenhuma aposta ativa!")
                 return
 
             ''' Each matchday has an array that describes each game from that matchday. In this query, we get the index in that array of the current game from the user's bet '''
@@ -138,6 +154,7 @@ class Aposta(commands.Cog):
                 ''' If the said flag is True, than the prognostic for that game is not valid. We then update the current game of the users's bet '''
                 if blocked:
                     await message.author.send(":lock: O jogo em que tentaste apostar já não se encontra ativo!")
+                    self.logger.info(f"\n[on_message] {message.author.display_name} -> Tentou apostar no jogo ({jornada['jogos'][position['index']]['id_jogo']}) mas este já não se encontra ativo!")
                     embed = discord.Embed(title = "Aposta", colour = discord.Colour.green())
                     embed.set_thumbnail(url = message.author.avatar_url)
                     
@@ -162,10 +179,12 @@ class Aposta(commands.Cog):
                 if len(re.findall(r"\s*(x)\s*-\s*(x)\s*", message.content.lower())) > 0:        # x-x : Não quer apostar
                     position["index"] += 1
                 
-                    if position["index"] > len(jornada["jogos"]) - 1: 
+                    if position["index"] > len(jornada["jogos"]) - 1:
+                        self.logger.info(f"\n[on_message] {message.author.display_name} apostou x-x no jogo ({jornada['jogos'][position['index'] - 1]['id_jogo']}) e a jornada terminou!") 
                         database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id}, {"$set" : {"status" : "TERMINADA"}})
 
                     else: 
+                        self.logger.info(f"\n[on_message] {message.author.display_name} apostou x-x no jogo ({jornada['jogos'][position['index'] - 1]['id_jogo']})!") 
                         database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id}, {"$set" : {"current" : jornada["jogos"][position["index"]]["id_jogo"]}})
                 
                 elif len(re.findall(r'\d+', message.content.lower())) == 2:                     # 2-2 : Aposta válida
@@ -184,6 +203,8 @@ class Aposta(commands.Cog):
                     result = res
                     res = f"{res[0]}-{res[1]}"
 
+                    self.logger.info(f"\n[on_message] {message.author.display_name} apostou {res} ({message.content}) no jogo ({jornada['jogos'][position['index'] - 1]['id_jogo']})!") 
+                    
                     if position["index"] == len(jornada["jogos"]) - 1:
                         database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id, "apostas.id_jogo" : jornada["jogos"][position["index"]]["id_jogo"]},
                                                                                 {"$set" : {"status" : "TERMINADA", "apostas.$.tendencia" : tendencia, "joker" : joker, "apostas.$.resultado" : res}})
@@ -225,30 +246,31 @@ class Aposta(commands.Cog):
                         await message.author.send(embed = embed)
                         
                 else:
+                    self.logger.warning(f"\n[on_message] {message.author.display_name} apostou ({message.content}) no jogo ({jornada['jogos'][position['index'] - 1]['id_jogo']}) e este não é válido!") 
                     await message.author.send(":x: Resultado inválido!")
                     return
 
             except StopIteration:
+                self.logger.error(f"\n[on_message] {message.author.display_name} -> Não existe nenhum jogo para apostar!")
                 pass
         
         else:
             return
 
-    @commands.command(brief = "**Atualizar um determinado jogo!**", description = "**Utilização:** `td!update [competição] [id jogo] [resultado]`")
+    @commands.command(brief = "**Atualizar um determinado jogo!**", description = "**Utilização:** `td!update [id jogo] [resultado]`")
     @commands.check(is_comp_not)
-    async def update(self, ctx, comp : str, id_jogo: str, *res):
+    async def update(self, ctx, id_jogo: str, *res):
         database = pymongo.MongoClient(port = 27017)
-
-        print(id_jogo)
 
         id_jogo = int(re.findall(r"\d+", id_jogo)[0])
         # Verifica se existe uma jornada ativa na competição
-        jornada = database["totobola"]["jornadas"].find_one( {"competicao" : comp, "estado" : "ATIVA", "jogos" : { "$elemMatch" : {"id_jogo" : id_jogo, "estado" : "SCHEDULED"}}},
+        jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "jogos" : { "$elemMatch" : {"id_jogo" : id_jogo, "estado" : "SCHEDULED"}}},
                                                             {"_id" : 0, "id_jornada" : 1, "competicao" : 1, "jogos" : {"$elemMatch" : {"id_jogo" : id_jogo}}})
-        
-        print(jornada)
 
+        self.logger.info(f"\n(1) [update] Jogador: {ctx.message.author.display_name} - ID Jogo: {id_jogo} - Resultado: {res}") 
+        
         if jornada is None:
+            self.logger.warning(f"\n(2) [update] Jogador: {ctx.message.author.display_name} - ID Jogo: {id_jogo} -> Impossível apostar no jogo!")
             await ctx.send(":closed_lock_with_key: Impossível apostar nesse jogo!")
             return
         
@@ -273,16 +295,17 @@ class Aposta(commands.Cog):
             
             embed = discord.Embed(title = "Atualização de Jogo", colour = discord.Colour.green())
             embed.set_thumbnail(url = ctx.author.avatar_url)
-            embed.add_field(name = "Competição", value=comp)
-            embed.add_field(name = "ID", value=jornada["id_jornada"])
-            embed.add_field(name = "Jogo", value=f"{jornada['jogos'][0]['homeTeam']} - {jornada['jogos'][0]['awayTeam']}")
-            embed.add_field(name = "Antigo", value=bet["apostas"][0]["resultado"])
-            embed.add_field(name = "Novo", value=res)
-            embed.add_field(name = "Joker", value=bet["joker"]["id_jogo"])
+            embed.add_field(name = "ID", value=f"`{jornada['id_jornada']}`")
+            embed.add_field(name = "Jogo", value=f"`{jornada['jogos'][0]['homeTeam']} - {jornada['jogos'][0]['awayTeam']}`")
+            embed.add_field(name = "Antigo", value=f"`{bet['apostas'][0]['resultado']}`")
+            embed.add_field(name = "Novo", value=f"`{res}`")
+            embed.add_field(name = "Joker", value=f"`{bet['joker']['id_jogo']}`")
 
             await ctx.send(embed = embed)
-
+            self.logger.info(f"\n(2) [update] Jogador: {ctx.message.author.display_name} - ID Jogo: {id_jogo} - Resultado: {res} -> Sucesso!")
+        
         else:
+            self.logger.warning(f"\n(2) [update] Jogador: {ctx.message.author.display_name} - ID Jogo: {id_jogo} -> Insucesso!")
             await ctx.send(":x: Aposta inválida!")
 
     def show_h2h(self, jornada, position, embed):
@@ -304,8 +327,8 @@ class Aposta(commands.Cog):
                 str_jogos += f":soccer: `{jogo['id_jogo']}`: **{jogo['homeTeam']}** `{bet['apostas'][j]['resultado'][: bet['apostas'][j]['resultado'].index('-')]}-{bet['apostas'][j]['resultado'][bet['apostas'][j]['resultado'].index('-')+1 :]}` **{jogo['awayTeam']}**\n"
 
         embed = discord.Embed(title = "Aposta", colour = discord.Colour.dark_theme())
-        embed.add_field(name = "ID", value = jornada["id_jornada"])
-        embed.add_field(name = "Joker", value = bet["joker"]["id_jogo"])
+        embed.add_field(name = "ID", value = f'`{jornada["id_jornada"]}`')
+        embed.add_field(name = "Joker", value = f'`{bet["joker"]["id_jogo"]}`')
         embed.description = str_jogos
         embed.set_thumbnail(url = user.avatar_url)
         embed.add_field(name = "Jogador", value = f"`{user.display_name}`")

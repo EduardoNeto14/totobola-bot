@@ -2,3 +2,5 @@ discord/*
 token.txt
 api-token.txt
 temp/
+logs/
+erase.sh
