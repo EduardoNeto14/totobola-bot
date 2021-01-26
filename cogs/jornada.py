@@ -143,13 +143,13 @@ class Jornada(commands.Cog):
     @commands.command(brief = "**Monitoriza os jogos em atividade!**", description = "**Utilização:** `td!load`")
     @commands.check( is_admin )
     async def load(self, ctx):
-        print("load")
+        await ctx.send(":eye: Verificando ativamente os jogos...")
         self.task = self.client.loop.create_task(check_games(self.client))
     
     @commands.command(brief = "**Para de monitorizar os jogos em atividade!**", description = "**Utilização:** `td!unload`")
     @commands.check( is_admin )
     async def unload(self, ctx):
-        print("unload")
+        await ctx.send(":stop_sign: Verificação dos jogos cancelada...")
         self.task.cancel()
         self.task = None
 

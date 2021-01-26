@@ -20,7 +20,7 @@ class Aposta(commands.Cog):
         
         file_handler = logging.FileHandler("logs/info.log")
         file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.INFO)
+        self.logger.setLevel(logging.INFO)
 
         self.logger.addHandler(file_handler)
 

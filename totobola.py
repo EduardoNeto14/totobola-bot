@@ -11,4 +11,5 @@ with open(f"{PATH}/token.txt", "r") as token:
 for filename in os.listdir(f"{PATH}/cogs"):
     if filename.endswith(".py") : client.load_extension(f"cogs.{filename[:-3]}")
     '''and filename != "teste.py"'''
+
 client.run(token)

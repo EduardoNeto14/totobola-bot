@@ -15,7 +15,7 @@ class Info(commands.Cog):
         
         file_handler = logging.FileHandler("logs/info.log")
         file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.INFO)
+        self.logger.setLevel(logging.INFO)
 
         self.logger.addHandler(file_handler)
     
@@ -43,7 +43,6 @@ class Info(commands.Cog):
             
             for comp in competicoes["competicoes"]:
                 info = database["totobola"][comp["competicao"]].find_one({"player_id" : ctx.message.mentions[0].id}, {"_id" : 0})
-                print(info)
                 if info is not None:
                     data_to_send += f":trophy: **{comp['competicao']}**\n"
                     position = database["totobola"][comp["competicao"]].count_documents({"pontuacao" : {"$gt" : info["pontuacao"]}})

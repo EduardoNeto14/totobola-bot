@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.utils import get
 import os
 import pymongo
 import json
@@ -47,6 +48,8 @@ class Registar(commands.Cog):
                     embed.add_field(name = "**Nome**", value = f"`{user.display_name}`")
                     embed.description = "Muito obrigado por participares! \n\nBoa sorte!"
                     await user.send(embed = embed)
+                    role = get(user.server.roles, name = "TotobolaDiscordiano")
+                    await self.client.add_roles(user, role)
                 
                 else:
                     # TODO: Melhorar mensagem #
