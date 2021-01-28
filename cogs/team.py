@@ -3,6 +3,7 @@ from discord.ext import commands
 import pymongo
 import random
 import asyncio
+import logging
 
 SECONDS = 60
 MINUTES = 10
@@ -12,7 +13,16 @@ logo = "https://cdn.discordapp.com/attachments/786651440528883745/79711479495170
 class Team(commands.Cog):
     def __init__(self, client):
         self.client = client
-    
+        self.logger = logging.getLogger(__name__)
+
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s")
+
+        file_handler = logging.FileHandler("logs/team.log")
+        file_handler.setFormatter(formatter)
+
+        self.logger.setLevel(logging.INFO)
+        self.logger.addHandler(file_handler)
+
     async def team_confirmation(self, ctx, init_member, confirm_member, team_name, team_id, color, msg = None):
             
         embed = discord.Embed()
@@ -66,13 +76,16 @@ class Team(commands.Cog):
                 embed.set_footer(text = "Totobola Discordiano")
                 embed.set_thumbnail(url = logo)
 
+                self.logger.info(f"[team_confirmation] {confirm_member.display_name} -> Aceitou formar equipa!")
                 await ctx.send(embed = embed)
 
                 await msg.delete()
 
             elif reaction.emoji == '❌' and user.id == confirm_member.id:
+                self.logger.info(f"\n[team_confirmation] {confirm_member.display_name} -> Recusou formar equipa!")
                 return
             elif user.id != confirm_member.id:
+                self.logger.info(f"\n[team_confirmation] {confirm_member.display_name} -> Não é o membro correto!")
                 await self.team_confirmation(ctx = ctx, msg = msg, init_member = init_member, confirm_member = confirm_member, team_name = team_name, team_id = team_id, color = color)
     
     @commands.command(brief = "**Cria uma equipa!**", description = "**Utilização:** `td!team [nome] [jogador]`")

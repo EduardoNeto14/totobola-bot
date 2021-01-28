@@ -186,7 +186,6 @@ class Totobola(commands.Cog):
             elif reaction.emoji == '⏩' and start < max - 1:
                 await self.pages(ctx=ctx, msg=msg, start=start+1, per_page=per_page, max=max)
 
-    # TODO:
     @commands.command(brief = "**Cancela um jogo!**", description = "**Utilização:** `td!cancel [id jogo]`")
     @commands.check( is_admin )
     async def cancel(self, ctx, id_jogo):
@@ -208,7 +207,6 @@ class Totobola(commands.Cog):
         else:
             await ctx.send(":x: **Jogo não encontrado!**")
     
-    # TODO:
     @commands.command(brief = "**Atribui um resultado a um jogo!**", description = "**Utilização:** `td!resultado [id_jogo] [resultado]`")
     @commands.check( is_admin )
     async def resultado(self, ctx, id_jogo, resultado):
@@ -238,6 +236,20 @@ class Totobola(commands.Cog):
                 await calculate(game, self.client)
         else:
             await ctx.send(":x: **Jogo não encontrado!**")
+
+    @commands.command(brief = "**Atribui prognóstico de um jogo!** (por realizar)", description = "**Utilização:** `td!prog [jogador] [id_jogo] [resultado]`")
+    @commands.check(is_admin)
+    async def prog(self, ctx, player : discord.User, id_jogo, *resultado):
+        # Verificar se player é uma menção
+        
+        # Verificar a jornada a que o id_jogo pertence e se esta está ativa
+        
+        # join resultado, re para obter os inteiros e verificar se tem joker
+
+        # verificar se joker.processed = 0
+
+        # alterar o estado da aposta do jogador para ativa ou terminada dependendo do estado da mesma
+        pass
 
 def setup(client):
     client.add_cog(Totobola(client))
