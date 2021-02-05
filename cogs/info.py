@@ -235,8 +235,18 @@ class Info(commands.Cog):
             elif reaction.emoji == '⏩' and start < max - 1:
                 await self.pages(ctx=ctx, competicao=competicao, msg=msg, start=start+1, per_page=per_page, max=max)
 
-    @commands.command(brief = "**Mostra todos os vencedores da jornada!**", description = "**Utilização:** `td!geraldes`")
+    @commands.command(brief = "**Mostra todos os vencedores das jornadas!** *por realizar*", description = "**Utilização:** `td!geraldes`")
     async def geraldes(self, ctx):
+        database = pymongo.MongoClient(port = 27017)
+        
+        if "geraldes" not in database["totobola"].list_collection_names():
+            await ctx.send(":x: **Não existem vencedores registados!**")
+        else:
+            pass
+            #await self.win_pages(ctx)
+    
+    @commands.command(brief = "**Mostra todos os vencedores por jornada!**", description = "**Utilização:** `td!vencedores`")
+    async def vencedores(self, ctx):
         database = pymongo.MongoClient(port = 27017)
         
         if "geraldes" not in database["totobola"].list_collection_names():

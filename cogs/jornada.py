@@ -252,7 +252,7 @@ class Jornada(commands.Cog):
             "current" : jornada["jogos"][0]["id_jogo"],
             "pontuacao" : 0,
             "joker" : {"id_jogo": None, "processed" : 0},
-            "apostas" : [{"id_jogo" : jogo["id_jogo"], "resultado" : None, "tendencia" : None} for jogo in jornada["jogos"]]
+            "apostas" : [{"id_jogo" : jogo["id_jogo"], "resultado" : None, "tendencia" : None, "difference" : None, "pontuacao" : 0} for jogo in jornada["jogos"]]
         }
         
         jogos = "\n".join([f":soccer: `{jogo['id_jogo']}` **{jogo['homeTeam']}** - **{jogo['awayTeam']}**" for jogo in jornada["jogos"]])

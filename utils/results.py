@@ -62,7 +62,10 @@ async def calculate(game, client):
         if aposta["apostas"][0]["resultado"] == result:
             pontuacao = 3
         elif aposta["apostas"][0]["tendencia"] == api_to_db[game["score"]["winner"]]:
-            pontuacao = 1
+            if (int(game['score']['fullTime']['homeTeam']) - int(game['score']['fullTime']['awayTeam'])) == (aposta['apostas'][0]['difference']):
+                pontuacao = 2
+            else:
+                pontuacao = 1
 
         ''' If the user used the joker, the points are doubled! '''
         if aposta["joker"]["id_jogo"] == game["id"]:
@@ -74,8 +77,8 @@ async def calculate(game, client):
         if pontuacao != 0:
             ''' Increment the score in the corresponding bet! '''
             database["totobola"][jornada["id_jornada"]].update_one(
-                                                                {"player_id" : aposta["player_id"]},
-                                                                { "$set" : {"joker" : aposta["joker"], "pontuacao" : aposta["pontuacao"] + pontuacao}} )
+                                                                {"player_id" : aposta["player_id"], "apostas.id_jogo" : game["id"]},
+                                                                { "$set" : {"joker" : aposta["joker"], "pontuacao" : aposta["pontuacao"] + pontuacao, "apostas.$.pontuacao" : pontuacao}} )
             
             ''' Increment the score in the corresponding competition! '''
             database["totobola"][jornada["id_jornada"].split(":")[0]].update_one({"player_id" : aposta["player_id"]},

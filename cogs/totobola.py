@@ -269,6 +269,8 @@ class Totobola(commands.Cog):
                 elif goals[1] > goals[0] : tendency = "awayWin"
                 else : tendency = "draw"                
 
+                difference = int(goals[0]) - int(goals[1])
+
                 res = f"{goals[0]}-{goals[1]}"
             else:
                 await ctx.send(":x: Resultado inválido!")
@@ -286,12 +288,12 @@ class Totobola(commands.Cog):
                 embed.add_field(name = "Jogador", value = ctx.message.mentions[0].display_name)
 
                 if "*" in new_result and curr_bet["joker"]["processed"] != 1:
-                    database["totobola"][jornada["id_jornada"]].update_one({"player_id" : ctx.message.mentions[0].id, "apostas.id_jogo" : int(id_jogo)}, {"$set" : {"joker.id_jogo" : int(id_jogo), "apostas.$.resultado" : res, "apostas.$.tendencia" : tendency}})
+                    database["totobola"][jornada["id_jornada"]].update_one({"player_id" : ctx.message.mentions[0].id, "apostas.id_jogo" : int(id_jogo)}, {"$set" : {"joker.id_jogo" : int(id_jogo), "apostas.$.resultado" : res, "apostas.$.tendencia" : tendency, "apostas.$.difference" : difference}})
                     embed.description = f":soccer: **{jornada['jogos'][0]['id_jogo']}: {jornada['jogos'][0]['homeTeam']}** `{res}` **{jornada['jogos'][0]['homeTeam']}** :black_joker:"
                     await ctx.send(embed = embed)
                     self.logger.info(f"\n[prog] Admin {ctx.message.author.display_name} -- ({ctx.message.mentions[0].display_name}) Jogo {id_jogo} alterado para {res} com joker!")
                 else:
-                    database["totobola"][jornada["id_jornada"]].update_one({"player_id" : ctx.message.mentions[0].id, "apostas.id_jogo" : int(id_jogo)}, {"$set" : {"apostas.$.resultado" : res, "apostas.$.tendencia" : tendency}})
+                    database["totobola"][jornada["id_jornada"]].update_one({"player_id" : ctx.message.mentions[0].id, "apostas.id_jogo" : int(id_jogo)}, {"$set" : {"apostas.$.resultado" : res, "apostas.$.tendencia" : tendency, "apostas.$.difference" : difference}})
                     embed.description = f":soccer: **{jornada['jogos'][0]['id_jogo']}: {jornada['jogos'][0]['homeTeam']}** `{res}` **{jornada['jogos'][0]['homeTeam']}**"
                     await ctx.send(embed = embed)
                     self.logger.info(f"\n[prog] Admin {ctx.message.author.display_name} -- ({ctx.message.mentions[0].display_name}) Jogo {id_jogo} alterado para {res}!")

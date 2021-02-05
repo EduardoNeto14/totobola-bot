@@ -202,6 +202,8 @@ class Aposta(commands.Cog):
                     elif int(res[0]) == int(res[1]) : tendencia = "draw"
                     elif int(res[0]) < int(res[1]) : tendencia = "awayWin"
                     
+                    difference = int(res[0]) - int(res[1])
+
                     result = res
                     res = f"{res[0]}-{res[1]}"
 
@@ -209,7 +211,7 @@ class Aposta(commands.Cog):
                     
                     if position["index"] == len(jornada["jogos"]) - 1:
                         database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id, "apostas.id_jogo" : jornada["jogos"][position["index"]]["id_jogo"]},
-                                                                                {"$set" : {"status" : "TERMINADA", "apostas.$.tendencia" : tendencia, "joker" : joker, "apostas.$.resultado" : res}})
+                                                                                {"$set" : {"status" : "TERMINADA", "apostas.$.tendencia" : tendencia, "joker" : joker, "apostas.$.resultado" : res, "apostas.$.difference" : difference}})
                     
                         #TODO: Melhorar mensagem #
                         
@@ -233,7 +235,7 @@ class Aposta(commands.Cog):
 
                     else:
                         database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id, "apostas.id_jogo" : jornada["jogos"][position["index"]]["id_jogo"]},
-                                                                                {"$set" : {"current" : jornada["jogos"][position["index"] + 1]["id_jogo"], "apostas.$.tendencia" : tendencia, "joker" : joker, "apostas.$.resultado" : res}})
+                                                                                {"$set" : {"current" : jornada["jogos"][position["index"] + 1]["id_jogo"], "apostas.$.tendencia" : tendencia, "joker" : joker, "apostas.$.resultado" : res, "apostas.$.difference" : difference}})
 
                         #TODO: Melhorar message#
                         embed = discord.Embed(title = "Aposta", colour = discord.Colour.green())
@@ -292,9 +294,10 @@ class Aposta(commands.Cog):
             elif int(res[0]) == int(res[1]) : tendencia = "draw"
             elif int(res[0]) < int(res[1]) : tendencia = "awayWin"
             
+            difference = int(res[0]) - int(res[1])
             res = f"{res[0]}-{res[1]}"
             
-            database["totobola"][jornada["id_jornada"]].update({"player_id" : ctx.author.id, "apostas.id_jogo" : id_jogo}, {"$set" : {"joker" : bet["joker"], "apostas.$.tendencia" : tendencia, "apostas.$.resultado" : res}})
+            database["totobola"][jornada["id_jornada"]].update({"player_id" : ctx.author.id, "apostas.id_jogo" : id_jogo}, {"$set" : {"joker" : bet["joker"], "apostas.$.tendencia" : tendencia, "apostas.$.resultado" : res, "apostas.$.difference" : difference}})
             
             embed = discord.Embed(title = "Atualização de Jogo", colour = discord.Colour.green())
             embed.set_thumbnail(url = ctx.author.avatar_url)
@@ -357,12 +360,12 @@ class Aposta(commands.Cog):
                         if jogo["resultado"] is None:
                             pass
                         else:
-                            games += f":soccer: `{jogo['id_jogo']}` **{jornada['jogos'][j]['homeTeam']} {jogo['resultado']} {jornada['jogos'][j]['awayTeam']}**"
+                            games += f":soccer: `{jogo['id_jogo']}` **{jornada['jogos'][j]['homeTeam']} {jogo['resultado']} {jornada['jogos'][j]['awayTeam']}**\n\t\t\t:dart: **Pontuação:** `{jogo['pontuacao']}`"
                             
                             if bet["joker"]["id_jogo"] == jogo["id_jogo"]:
-                                games += " :black_joker:\n"
+                                games += " :black_joker:\n\n"
                             else:
-                                games += "\n"
+                                games += "\n\n"
                     
                     embed.description = games
                 
