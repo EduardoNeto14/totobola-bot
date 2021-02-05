@@ -91,7 +91,7 @@ class Info(commands.Cog):
             
             if competicoes is not None:
                 data_to_send += f":trophy: **Total**\n"
-                position = database["totobola"]["total"].count_documents({"pontuacao" : {"$gt" : info["pontuacao"]}})
+                position = database["totobola"]["total"].count_documents({"pontuacao" : {"$gt" : competicoes["pontuacao"]}})
                 data_to_send += f"**Posição:** `{position + 1}º` **Pontuação:** `{competicoes['pontuacao']}\n\n`"
                 
             if team is not None:
@@ -141,14 +141,18 @@ class Info(commands.Cog):
         jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "competicao" : competicao}, {"_id" : 0, "id_jornada" : 1, "jogos" : 1})
 
         if jornada is None:
-            await ctx.send("Jornada inexistente!")
+            await ctx.send(":x: **Jornada inexistente!**")
 
-        jogos = f"ID Jornada: `{jornada['id_jornada']}`\n\n"
+        embed = discord.Embed(title = "Jornada", colour = discord.Colour.dark_grey())
+        embed.add_field(name = "ID Jornada", value = f"`{jornada['id_jornada']}`")
 
+        jogos = ""
         for jogo in jornada["jogos"]:
             jogos += f":soccer: `{jogo['id_jogo']}`: **{jogo['homeTeam']} - {jogo['awayTeam']}**\n"
 
-        await ctx.send(jogos)
+        embed.description = jogos
+        embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
+        await ctx.send(embed = embed)
 
     async def pages(self, ctx, competicao, msg = None, start = 0, per_page = 10, max = None):
         database = pymongo.MongoClient(port = 27017)
@@ -186,20 +190,21 @@ class Info(commands.Cog):
                 data_to_send += f"{medals[p]} **{player['table']['player_name']}**\n:dart: **Pontuação:** `{player['pontuacao']}`"
 
                 if competicao != "total":
-                    data_to_send += f"\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
+                    data_to_send += f"\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\t\t\t:information_source: **Média:** `{round(player['pontuacao'] / int(player['apostas']), 2) if int(player['apostas'] != 0) else 'N.D.'}`\n\n"
                 else:
-                    data_to_send += "\n"
+                    data_to_send += "\n\n"
             else:
                 data_to_send += f"`{p + 1}º` **{player['table']['player_name']}**\n:dart: **Pontuação:** `{player['pontuacao']}`"
 
                 if competicao != "total":
-                    data_to_send += f"\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\n"
+                    data_to_send += f"\t\t\t:page_facing_up: **Apostas:** `{int(player['apostas'])}`\t\t\t:information_source: **Média:** `{round(player['pontuacao'] / int(player['apostas']), 2) if int(player['apostas'] != 0) else 'N.D.'}`\n\n"
                 else:
-                    data_to_send += "\n"
+                    data_to_send += "\n\n"
 
         embed = discord.Embed(title = f"Tabela {competicao}", colour = discord.Colour.dark_magenta())
         embed.description = data_to_send
-
+        embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
+        
         if msg is not None:
             await msg.edit(embed=embed)
             if not isinstance(msg.channel, discord.abc.PrivateChannel):
@@ -246,7 +251,8 @@ class Info(commands.Cog):
             max = int(database["totobola"][id_jornada].count_documents({}) / per_page) + 1
 
         players = database["totobola"][id_jornada].aggregate(
-            [{"$lookup" : 
+            [{"$match" : {"status" : {"$ne" : "INATIVA"}}},
+            {"$lookup" : 
                         { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
             {"$sort" : {"pontuacao" : -1}},
             {"$unwind" : "$table"},
@@ -261,7 +267,8 @@ class Info(commands.Cog):
             if p + start*per_page < 3:
                 medals = [":first_place:", ":second_place:", ":third_place:"]
                 data_to_send += f"{medals[p]} **{player['table']['player_name']}**\t\t-\t\t:dart: **Pontuação:** `{player['pontuacao']}`\n\n"
-
+            else:
+                data_to_send += f"`{start*per_page + p + 1}º` **{player['table']['player_name']}**\t\t-\t\t:dart: **Pontuação:** `{player['pontuacao']}`\n\n"
         embed = discord.Embed(title = f"Resultados {id_jornada}", colour = discord.Colour.dark_red())
         embed.description = data_to_send
 

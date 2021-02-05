@@ -5,6 +5,7 @@ import sys
 import json
 import asyncio
 import re
+import logging
 
 PATH = "/home/eduardo/HDD/Development/Totobola"
 logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
@@ -25,7 +26,16 @@ class Totobola(commands.Cog):
 
     def __init__(self, client):
         self.client = client
-    
+        self.logger = logging.getLogger(__name__)
+        
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s")
+        
+        file_handler = logging.FileHandler("logs/totobola.log")
+        file_handler.setFormatter(formatter)
+        self.logger.setLevel(logging.INFO)
+
+        self.logger.addHandler(file_handler)
+
     @commands.command(brief = "**Inicia o Totobola Discordiano!**", description = "**Utilização:** `td!totobola (competições)`")
     @commands.check(database_exists)
     async def totobola(self, ctx, *args):
@@ -242,9 +252,58 @@ class Totobola(commands.Cog):
     async def prog(self, ctx, player : discord.User, id_jogo, *resultado):
         # Verificar se player é uma menção
         
-        # Verificar a jornada a que o id_jogo pertence e se esta está ativa
+        if ctx.message.mentions is not None:
+            database = pymongo.MongoClient(port = 27017)
+
+            jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "jogos.id_jogo" : int(id_jogo)}, {"_id" : 0, "id_jornada" : 1, "jogos.$" : 1})
+
+            print(jornada)
+
+            new_result = "".join(resultado)
+            tendency = None
+
+            if len(re.findall(r'\d+', new_result.lower())) == 2:
+                goals = re.findall(r'\d+', new_result.lower())
+
+                if goals[0] > goals[1] : tendency = "homeWin"
+                elif goals[1] > goals[0] : tendency = "awayWin"
+                else : tendency = "draw"                
+
+                res = f"{goals[0]}-{goals[1]}"
+            else:
+                await ctx.send(":x: Resultado inválido!")
+                return
+            
+            if jornada is not None:
+                curr_bet = database["totobola"][jornada["id_jornada"]].find_one( {"player_id" : ctx.message.mentions[0].id}, {"_id" : 0})
+                
+                # TODO
+
+                embed = discord.Embed(title = "Alteração de Resultado", colour = discord.Colour.dark_red())
+                embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
+                embed.set_author(name = ctx.message.author.display_name, icon_url = ctx.message.author.avatar_url)
+                embed.set_thumbnail(url = ctx.message.mentions[0].avatar_url)
+                embed.add_field(name = "Jogador", value = ctx.message.mentions[0].display_name)
+
+                if "*" in new_result and curr_bet["joker"]["processed"] != 1:
+                    database["totobola"][jornada["id_jornada"]].update_one({"player_id" : ctx.message.mentions[0].id, "apostas.id_jogo" : int(id_jogo)}, {"$set" : {"joker.id_jogo" : int(id_jogo), "apostas.$.resultado" : res, "apostas.$.tendencia" : tendency}})
+                    embed.description = f":soccer: **{jornada['jogos'][0]['id_jogo']}: {jornada['jogos'][0]['homeTeam']}** `{res}` **{jornada['jogos'][0]['homeTeam']}** :black_joker:"
+                    await ctx.send(embed = embed)
+                    self.logger.info(f"\n[prog] Admin {ctx.message.author.display_name} -- ({ctx.message.mentions[0].display_name}) Jogo {id_jogo} alterado para {res} com joker!")
+                else:
+                    database["totobola"][jornada["id_jornada"]].update_one({"player_id" : ctx.message.mentions[0].id, "apostas.id_jogo" : int(id_jogo)}, {"$set" : {"apostas.$.resultado" : res, "apostas.$.tendencia" : tendency}})
+                    embed.description = f":soccer: **{jornada['jogos'][0]['id_jogo']}: {jornada['jogos'][0]['homeTeam']}** `{res}` **{jornada['jogos'][0]['homeTeam']}**"
+                    await ctx.send(embed = embed)
+                    self.logger.info(f"\n[prog] Admin {ctx.message.author.display_name} -- ({ctx.message.mentions[0].display_name}) Jogo {id_jogo} alterado para {res}!")
+
+                if curr_bet["status"] == "INATIVA":
+                    database["totobola"][jornada["id_jornada"]].update_one({"player_id" : ctx.message.mentions[0].id}, {"$set" : {"status" : "ATIVA"}})
+            
+            else:
+                await ctx.send(":x: Não existe nenhuma jornada ativa com esse jogo!")
         
-        # join resultado, re para obter os inteiros e verificar se tem joker
+        else:
+            await ctx.send(":x: Precisas de mencionar um jogador!")
 
         # verificar se joker.processed = 0
 

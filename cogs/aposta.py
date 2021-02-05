@@ -18,7 +18,7 @@ class Aposta(commands.Cog):
         
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s")
         
-        file_handler = logging.FileHandler("logs/info.log")
+        file_handler = logging.FileHandler("logs/aposta.log")
         file_handler.setFormatter(formatter)
         self.logger.setLevel(logging.INFO)
 
@@ -77,16 +77,17 @@ class Aposta(commands.Cog):
             embed = discord.Embed(title = "Aposta", colour = discord.Colour.green())
             embed.set_thumbnail(url = user.avatar_url)
             
-            embed.add_field(name = "Jornada", value = f"`{j['id_jornada']}`")
-            
-            embed.add_field(name = f"{j['jogos'][position['index']]['homeTeam']} - {j['jogos'][position['index']]['awayTeam']}", value = f"`{j['jogos'][position['index']]['id_jogo']}`")
+            embed.description = f":soccer: `{j['jogos'][position['index']]['id_jogo']}` **{j['jogos'][position['index']]['homeTeam']} - {j['jogos'][position['index']]['awayTeam']}**"
 
             h2hHome = "\n".join(j['jogos'][position['index']]["h2hHome"])
             h2hAway = "\n".join(j['jogos'][position['index']]["h2hAway"])
             
             embed.add_field(name = f"H2H {j['jogos'][position['index']]['homeTeam']}", value = f"{h2hHome}", inline = False)
             embed.add_field(name = f"H2H {j['jogos'][position['index']]['awayTeam']}", value = h2hAway)
+            embed.add_field(name = "Jornada", value = f"`{j['id_jornada']}`")
             
+            embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
+
             await user.send(embed = embed)
             await reaction.message.unpin()
             
@@ -164,6 +165,7 @@ class Aposta(commands.Cog):
                     joker = bet["joker"]
                     embed.add_field(name = "Jornada", value = f"`{jornada['id_jornada']}`", inline = False)
                     embed.add_field(name = "Joker", value = f"`{joker['id_jogo']}`")
+                    embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
 
                     await message.author.send(embed = embed)
                     database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id} , { "$set" : {"current" : jornada["jogos"][position["index"]]["id_jogo"]}})
@@ -217,7 +219,8 @@ class Aposta(commands.Cog):
                         embed.add_field(name = "Jornada", value = f"`{jornada['id_jornada']}`")
                         embed.add_field(name = "Joker", value = f"`{joker['id_jogo']}`")
                         embed.description = f"**{jornada['jogos'][position['index']]['homeTeam']} `{result[0]}-{result[1]}` {jornada['jogos'][position['index']]['awayTeam']}**"
-                        
+                        embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
+
                         await message.author.send(embed = embed)
                         
                         #TODO: enviar para canal#
@@ -242,7 +245,8 @@ class Aposta(commands.Cog):
                         
                         embed.add_field(name = "Jornada", value = f"`{jornada['id_jornada']}`", inline = False)
                         embed.add_field(name = "Joker", value = f"`{joker['id_jogo']}`")
- 
+                        embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
+                        
                         await message.author.send(embed = embed)
                         
                 else:
@@ -258,7 +262,6 @@ class Aposta(commands.Cog):
             return
 
     @commands.command(brief = "**Atualizar um determinado jogo!**", description = "**Utilização:** `td!update [id jogo] [resultado]`")
-    @commands.check(is_comp_not)
     async def update(self, ctx, id_jogo: str, *res):
         database = pymongo.MongoClient(port = 27017)
 
@@ -296,8 +299,8 @@ class Aposta(commands.Cog):
             embed = discord.Embed(title = "Atualização de Jogo", colour = discord.Colour.green())
             embed.set_thumbnail(url = ctx.author.avatar_url)
             embed.add_field(name = "ID", value=f"`{jornada['id_jornada']}`")
-            embed.add_field(name = "Jogo", value=f"`{jornada['jogos'][0]['homeTeam']} - {jornada['jogos'][0]['awayTeam']}`")
-            embed.add_field(name = "Antigo", value=f"`{bet['apostas'][0]['resultado']}`")
+            embed.add_field(name = "Jogo", value=f"`{jornada['jogos'][0]['homeTeam']} - {jornada['jogos'][0]['awayTeam']}`", inline = False)
+            embed.add_field(name = "Antigo", value=f"`{bet['apostas'][0]['resultado']}`", inline = False)
             embed.add_field(name = "Novo", value=f"`{res}`")
             embed.add_field(name = "Joker", value=f"`{bet['joker']['id_jogo']}`")
 

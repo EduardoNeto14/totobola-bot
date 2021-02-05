@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s")
 
-file_handler = logging.FileHandler("logs/info.log")
+file_handler = logging.FileHandler("logs/result.log")
 file_handler.setFormatter(formatter)
 logger.setLevel(logging.INFO)
 
@@ -40,18 +40,18 @@ async def calculate(game, client):
 
     logger.info(f"[calculate] {game}")
     ''' Check if the id of the game belongs to an active matchday and if it wasn't already processed! '''
-    jornada = database["totobola"]["jornadas"].find_one({"estado" : "ATIVA", "jogos.id_jogo" : game["id"], "jogos.$.estado" : {"$ne" : "PROCESSED"}},
-                                                        {"_id" : 0, "id_jornada": 1, "competicao" : 1})
+    jornada = database["totobola"]["jornadas"].find_one({"estado" : "ATIVA", "jogos" : { "$elemMatch" : {"id_jogo" : game["id"], "estado" :  {"$ne" : "PROCESSED"}}}}, {"_id" : 0, "id_jornada": 1, "competicao" : 1})
 
     ''' If the previous query returns nothing, than it must mean that the game was already processed and we shouldn't need to do anything!'''
     if jornada is None: return
 
     ''' Otherwise we retrieve every bet that has a valid value (not None)! '''
-    apostas = database["totobola"][jornada["id_jornada"]].find({"apostas.id_jogo" : game["id"], "apostas.resultado" : {"$ne" : None}},
-                                                                {"_id" : 0, "player_id" :1, "joker" : 1, "pontuacao" : 1, "apostas" : {"$elemMatch" : {"id_jogo" : game["id"]}}})
+    apostas = database["totobola"][jornada["id_jornada"]].find({"apostas" : { "$elemMatch" : {"id_jogo" : game["id"], "resultado" : {"$ne" : None}}}},
+                                                                {"_id" : 0, "player_id" : 1, "joker" : 1, "pontuacao" : 1, "apostas" : {"$elemMatch" : {"id_jogo" : game["id"]}}})
 
     ''' The result of the game! '''
     result = f"{game['score']['fullTime']['homeTeam']}-{game['score']['fullTime']['awayTeam']}"
+    logger.info(f"Jogo {game['id']} : {result} : {game['score']['winner']}\n[calculate]\n")
 
     ''' For every bet ... '''
     for aposta in apostas:
@@ -69,6 +69,8 @@ async def calculate(game, client):
             aposta["joker"]["processed"] = 1
             pontuacao *= 2
 
+        logger.info(f"{aposta['player_id']} -- Aposta: {aposta['apostas'][0]['resultado']} -- Joker: {aposta['joker']['id_jogo']} -- Pontuação : {pontuacao}")
+        
         if pontuacao != 0:
             ''' Increment the score in the corresponding bet! '''
             database["totobola"][jornada["id_jornada"]].update_one(
@@ -82,6 +84,8 @@ async def calculate(game, client):
             ''' Increment the score in the overall table! '''
             database["totobola"]["total"].update_one({"player_id": aposta["player_id"], "p_competicoes.competicao" : jornada["competicao"]},
                                                      { "$inc" : {"pontuacao" : pontuacao, "p_competicoes.$.pontuacao" : pontuacao}})
+
+    logger.info("\n[calculate]")
 
     ''' Set the game as PROCESSED! '''
     database["totobola"]["jornadas"].update_one({"id_jornada" : jornada["id_jornada"], "jogos.id_jogo" : game["id"]},
@@ -209,12 +213,26 @@ async def finish_matchday(client, jornada):
 
     str_winners = ""
     for vencedor in vencedores:
-        str_winners += f"**{vencedor['vencedores'][0]['player_name']}**"
+        str_winners += f"**{vencedor['vencedores'][0]['player_name']}**\n"
     
     embed.description = data_to_send
     
     embed.add_field(name = "Vencedores", value = str_winners)
     embed.add_field(name = "Pontuação", value = f"`{maximum['pontuacao']}`")
+    
+    #inserir média da jornada
+    
+    media = database["totobola"][jornada["id_jornada"]].aggregate([
+        {"$match" : {"status" : {"$ne" : "INATIVA"}}},
+        {"$group" : {"_id" : None, "average" : {"$avg" : "$pontuacao"}}}
+    ])
+
+    try:
+        media = media.next()
+        embed.add_field(name = "Média", value = f"`{round(media['average'], 2)}`")
+    except StopIteration:
+        pass
+    
     embed.set_footer(text = "Totobola Discordiano")
 
     await channel.send(embed = embed)

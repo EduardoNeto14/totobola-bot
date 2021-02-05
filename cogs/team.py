@@ -103,6 +103,14 @@ class Team(commands.Cog):
             if database["totobola"]["teams"].count_documents({"players" : {"$all" : [ctx.message.author.id, member1.id]}}) > 0:
                 await ctx.send(":x: **Um dos elementos já pertence a outra equipa!**")
                 return
+
+            if database["totobola"]["jogadores"].count_documents({"player_id" : ctx.message.mentions[0].id}) == 0:
+                await ctx.send(f":x: **{ctx.message.mentions[0].display_name} não faz parte da competição!")
+                return
+            
+            if database["totobola"]["jogadores"].count_documents({"player_id" : ctx.message.author.id}) == 0:
+                await ctx.send(f":x: **{ctx.message.author.display_name} não fazes parte da competição!")
+                return
             
             color = int("".join([random.choice("0123456789ABCDEF") for j in range(6)]), 16)
 
