@@ -3,6 +3,7 @@ from discord.ext import commands
 import pymongo
 import asyncio
 import logging
+import re
 
 logo = "https://cdn.discordapp.com/attachments/786651440528883745/797114794951704596/logo_totobola.png"
 
@@ -386,6 +387,56 @@ class Info(commands.Cog):
 
         else:
             await ctx.send(f":x: **Jornada** `{id_jornada}` **inválida!**")
+
+    @commands.command(brief = "**Verifica os utilizadores que apostaram num determinado resultado!**", description = "**Utilização:** `td!search [id_jogo] [resultado]`")
+    async def search(self, ctx, id_jogo, *res):
+        database = pymongo.MongoClient(port = 27017)
+
+        id_jogo = int(re.findall(r"\d+", id_jogo)[0])
+        # Verifica se existe uma jornada ativa na competição
+        jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "jogos" : { "$elemMatch" : {"id_jogo" : id_jogo}}},
+                                                            {"_id" : 0, "id_jornada" : 1})
+
+        if jornada is None:
+            await ctx.send("**O jogo que indicou não pertence a uma jornada ativa!**")
+            return
+
+        res = "".join(res)
+
+        if len(re.findall(r"\d+", res.lower())) == 2:
+            players = database["totobola"][jornada["id_jornada"]].aggregate(
+                [
+                {"$match" : {"apostas" : {"$elemMatch" : {"id_jogo" : int(id_jogo), "resultado" : res}}}},
+                {"$lookup" : 
+                            { "from" : "jogadores", "localField" : "player_id", "foreignField" : "player_id", "as" : "table"}},
+                {"$unwind" : "$table"},
+                {"$project" :
+                            { "table.player_name" : 1}}
+                ]
+            )
+
+            counter = 0
+
+            embed = discord.Embed(title="Garotões", colour = discord.Colour.dark_green()) 
+            embed.set_thumbnail(url = logo)
+            embed.set_footer(text = "Totobola Discordiano")
+            embed.add_field(name = "ID Jogo", value = f"`{id_jogo}`")
+            embed.add_field(name = "Resultado", value = f"`{res}`")
+
+            names = ""
+
+            for p in players:
+                counter += 1
+                names += f"**{p['table']['player_name']}**\n"
+
+            if counter == 0:
+                names = "**Nenhum jogador apostou nesse resultado!**"
+            
+            embed.description = names
+            await ctx.send(embed = embed)
+
+        else:
+            await ctx.send("**Resultado inválido!**")
 
 def setup(client):
     client.add_cog(Info(client))
