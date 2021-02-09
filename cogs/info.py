@@ -427,7 +427,7 @@ class Info(commands.Cog):
 
             for p in players:
                 counter += 1
-                names += f"**{p['table']['player_name']}**\n"
+                names += f"`{p['table']['player_name']}`\n"
 
             if counter == 0:
                 names = "**Nenhum jogador apostou nesse resultado!**"
