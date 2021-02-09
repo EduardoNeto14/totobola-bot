@@ -169,8 +169,8 @@ class Info(commands.Cog):
                 {"$unwind" : "$table"},
                 {"$project" :
                             { "player_id" : 1, "table.player_name" : 1, "pontuacao" : 1, "apostas" : 1}},
-                {"$limit" : per_page},
-                {"$skip" : start*per_page}
+                {"$skip" : start*per_page},
+                {"$limit" : per_page}
             ])
         else:
             players = database["totobola"][competicao].aggregate(
@@ -180,8 +180,8 @@ class Info(commands.Cog):
                 {"$unwind" : "$table"},
                 {"$project" :
                             { "player_id" : 1, "table.player_name" : 1, "pontuacao" :1}},
-                {"$limit" : per_page},
-                {"$skip" : start*per_page}
+                {"$skip" : start*per_page},
+                {"$limit" : per_page}
             ])
 
         data_to_send = ""
@@ -243,8 +243,80 @@ class Info(commands.Cog):
         if "geraldes" not in database["totobola"].list_collection_names():
             await ctx.send(":x: **Não existem vencedores registados!**")
         else:
-            pass
-            #await self.win_pages(ctx)
+            await self.num_wins(ctx = ctx)
+    
+    async def num_wins(self, ctx, msg = None, start = 0, per_page = 5, max = None):
+        database = pymongo.MongoClient(port = 27017)
+
+        if max is None:
+            '''n_winners = database["totobola"]["geraldes"].aggregate(
+                [
+                    {"$group": {"_id": None, "count": {"$sum": {"$size": "$vencedores" } } }}
+                ]
+            )'''
+
+            n_winners = database["totobola"]["geraldes"].distinct("vencedores")
+            max = int(len(n_winners) / per_page) + 1
+        
+        winners = database["totobola"]["geraldes"].aggregate(
+            [
+                {"$project" : {"_id" : 0, "vencedores" : 1}},
+                {"$unwind" : "$vencedores"},
+                {"$group" : {"_id" : "$vencedores", "wins" : {"$sum" : 1}}},
+                {"$lookup" : {
+                                "from" : "jogadores",
+                                "localField" : "_id",
+                                "foreignField" : "player_id",
+                                "as" : "winners"                    
+                            }
+                },
+                {"$project" : {"_id" : 0, "winner" : "$winners.player_name", "wins" : 1}},
+                {"$unwind" : "$winner"},        
+                {"$sort" : {"wins" : 1}},
+                {"$skip" : start*per_page},
+                {"$limit" : per_page}
+            ]
+        )
+
+        data_to_send = ""
+        
+        for winner in winners:
+            data_to_send += f":bust_in_silhouette: **Jogador:** `{winner['winner']}`\t\t\t\t\t**Vitórias:** `{winner['wins']}` :trophy:\n"
+
+        embed = discord.Embed(title = "Geraldes", colour = discord.Colour.dark_red())
+        embed.description = data_to_send
+        embed.set_thumbnail(url = logo)
+        embed.set_footer(text = "Totobola Discordiano")
+        
+        if msg is not None:
+            await msg.edit(embed=embed)
+            if not isinstance(msg.channel, discord.abc.PrivateChannel):
+                await msg.clear_reactions()
+        else:
+            msg = await ctx.send(embed=embed)
+        
+        if start > 0:
+            await msg.add_reaction('⏪')
+        if start < max - 1:
+            await msg.add_reaction('⏩')
+
+        # wait for reactions (2 minutes)
+        def check(reaction, user):
+            return True if user != self.client.user and str(reaction.emoji) in ['⏪', '⏩'] and reaction.message.id == msg.id else False
+        
+        try:
+            reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
+        except asyncio.TimeoutError:
+            await msg.delete()
+        
+        else:
+            # redirect on reaction
+            if reaction is None:
+                return
+            elif reaction.emoji == '⏪' and start > 0:
+                await self.num_wins(ctx=ctx, msg=msg, start=start-1, per_page=per_page, max=max)
+            elif reaction.emoji == '⏩' and start < max - 1:
+                await self.num_wins(ctx=ctx, msg=msg, start=start+1, per_page=per_page, max=max)
     
     @commands.command(brief = "**Mostra todos os vencedores por jornada!**", description = "**Utilização:** `td!vencedores`")
     async def vencedores(self, ctx):
@@ -269,8 +341,8 @@ class Info(commands.Cog):
             {"$unwind" : "$table"},
             {"$project" :
                         { "player_id" : 1, "table.player_name" : 1, "pontuacao" : 1}},
-            {"$limit" : per_page},
-            {"$skip" : start*per_page}
+            {"$skip" : start*per_page},
+            {"$limit" : per_page}
         ])
         
         data_to_send = ""
@@ -330,8 +402,8 @@ class Info(commands.Cog):
             { "$sort" : {
                 "pontuacao" : -1
             }},
-            { "$limit" : per_page},
-            { "$skip" : start*per_page}
+            { "$skip" : start*per_page},
+            { "$limit" : per_page}
         ])
         
         data_to_send = ""
