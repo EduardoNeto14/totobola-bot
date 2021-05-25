@@ -230,6 +230,81 @@ class Jornada(commands.Cog):
         database["totobola"][id_jornada].drop()
         database["totobola"]["jornadas"].delete_one({"id_jornada" : id_jornada})
 
+    async def progs_pages(self, ctx, id_jornada, jogo, id_jogo, msg = None, start = 0, per_page = 10, max = None):
+        database = pymongo.MongoClient(port = 27017)
+
+        if max is None:
+            max = int(database["totobola"][id_jornada].count_documents({"status" : {"$ne" : "INATIVA"}}) / per_page)
+
+        resultados = database["totobola"][id_jornada].aggregate([
+            {"$match" : {"apostas" : {"$elemMatch" : {"id_jogo" : id_jogo, "resultado" : {"$ne" : None}}}, "status" : {"$ne" : "INATIVA"}}},
+            {"$project" : {"player_id" : 1, "joker.id_jogo" : 1, "apostas" : {"$filter" : {"input" : "$apostas", "as" : "aposta", "cond" : {"$eq" : ["$$aposta.id_jogo", id_jogo]}}}}},
+            { "$lookup" : {
+                "from" : "jogadores",
+                "localField" : "player_id",
+                "foreignField" : "player_id",
+                "as" : "nome"
+            }},
+            { "$skip" : start*per_page},
+            { "$limit" : per_page}
+        ])
+
+        data_to_send = ""
+
+        for resultado in resultados:
+            data_to_send += f"**{resultado['nome'][0]['player_name']}** \t\t:\t\t {resultado['apostas'][0]['resultado']}"
+
+            if resultado['joker']['id_jogo'] == id_jogo:
+                data_to_send += "\t\t:black_joker:"
+
+            data_to_send += "\n"
+
+        embed = discord.Embed(title="Prognósticos", colour = discord.Colour.dark_gold())
+        embed.description = data_to_send
+        embed.set_thumbnail(url = logo)
+        embed.set_footer(text = "Totobola Discordiano")
+        embed.add_field(name = "Jogo", value = f"`{jogo}`")
+
+        if msg is not None:
+            await msg.edit(embed=embed)
+            if not isinstance(msg.channel, discord.abc.PrivateChannel):
+                await msg.clear_reactions()
+        else:
+            msg = await ctx.send(embed=embed)
+        
+        if start > 0:
+            await msg.add_reaction('⏪')
+        if start < max - 1:
+            await msg.add_reaction('⏩')
+
+        # wait for reactions (2 minutes)
+        def check(reaction, user):
+            return True if user != self.client.user and str(reaction.emoji) in ['⏪', '⏩'] and reaction.message.id == msg.id else False
+        
+        try:
+            reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
+        except asyncio.TimeoutError:
+            await msg.clear_reactions()
+        
+        else:
+            if reaction is None:
+                return
+            elif reaction.emoji == '⏪' and start > 0:
+                await self.progs_pages(ctx=ctx, id_jornada = id_jornada, jogo = jogo, id_jogo = id_jogo, msg=msg, start=start-1, per_page=per_page, max=max)
+            elif reaction.emoji == '⏩' and start < max - 1:
+                await self.progs_pages(ctx=ctx, id_jornada = id_jornada, jogo = jogo, id_jogo = id_jogo, msg=msg, start=start+1, per_page=per_page, max=max)
+
+    @commands.command(brief = "**Apostas dos jogadores num determinado jogo!**", description = "**Utilização:** `td!progs [id jogo]`")
+    async def progs(self, ctx, id_jogo):
+        database = pymongo.MongoClient(port = 27017)
+        jornada = database["totobola"]["jornadas"].find_one({"estado": "ATIVA", "jogos" : { "$elemMatch" : {"id_jogo": int(id_jogo), "estado" : {"$ne" : "SCHEDULED"}}}}, {"_id" : 0, "id_jornada" : 1, "jogos.$" : 1})
+        
+        if jornada is None:
+            await ctx.send("**Meu amor, tenta ver se o jogo já começou... Tá? Obrigado e bom trabalho!**")
+        else:
+            jogo = f"{jornada['jogos'][0]['homeTeam']}-{jornada['jogos'][0]['awayTeam']}"
+            await self.progs_pages(ctx = ctx, id_jornada = jornada ["id_jornada"], jogo = jogo, id_jogo = int(id_jogo))
+
     @staticmethod
     async def embed(ctx, competicao = "__Por definir__", jornada = "__Por definir__", jogos = []):
 

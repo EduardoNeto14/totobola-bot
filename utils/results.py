@@ -125,7 +125,7 @@ async def finish_matchday(client, jornada):
                                                         {"$set" : {"estado" : "TERMINADA"}} )
 
     ''' Get all the scores... '''
-    pontuacoes = database["totobola"][jornada["id_jornada"]].find({"estado" : {"$ne" : "INATIVA"}}, {"_id" : 0, "player_id" : 1, "pontuacao" : 1})
+    pontuacoes = database["totobola"][jornada["id_jornada"]].find({"estado" : {"$ne" : "INATIVA"}}, {"_id" : 0, "player_id" : 1, "pontuacao" : 1}).sort("pontuacao", pymongo.DESCENDING)
 
     position = 1
     last_pont = None

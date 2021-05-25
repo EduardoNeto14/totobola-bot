@@ -1,7 +1,9 @@
-discord/*
+discord/
 token.txt
 api-token.txt
 temp/
+images/
 logs/
 erase.sh
 query_wins.txt
+.vscode/

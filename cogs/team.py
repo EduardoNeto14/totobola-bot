@@ -81,7 +81,7 @@ class Team(commands.Cog):
 
                 await msg.delete()
 
-            elif reaction.emoji == '❌' and user.id == confirm_member.id:
+            elif reaction.emoji == '❌' and user.id in [confirm_member.id, init_member.id]:
                 self.logger.info(f"\n[team_confirmation] {confirm_member.display_name} -> Recusou formar equipa!")
                 return
             elif user.id != confirm_member.id:
@@ -100,7 +100,7 @@ class Team(commands.Cog):
                 await ctx.send(":x: **Nome da equipa já utilizado!**")
                 return
             
-            if database["totobola"]["teams"].count_documents({"players" : {"$all" : [ctx.message.author.id, member1.id]}}) > 0:
+            if database["totobola"]["jogadores"].find_one({"team_id" : None, "player_id" : ctx.message.author.id}) is None or database["totobola"]["jogadores"].find_one({"team_id" : None, "player_id" : ctx.message.mentions[0].id}) is None:
                 await ctx.send(":x: **Um dos elementos já pertence a outra equipa!**")
                 return
 

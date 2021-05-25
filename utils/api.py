@@ -59,6 +59,11 @@ async def check_games(client):
                 # Atualizar o estado do jogo na base de dados, para que o jogo fique bloqueado
                 database["totobola"]["jornadas"].update({"jogos.id_jogo" : match["id"]}, {"$set" : {"jogos.$.estado" : "LIVE"}})
                 
+                ##channel = database["totobola"]["properties"].find_one({}, {"_id" : 0, "channel" : 1})
+                ##channel = client.get_channel(channel["channel"])
+
+                ##await channel.send(f"**Utilize **`td!progs {match['id']}` **para ver os prognósticos do jogo!**")
+                
                 for jornada in jornadas:
                     for jogo in jornada["jogos"]:
                         if match["id"] == jogo["id_jogo"]:
@@ -126,9 +131,14 @@ def get_jornada(code, n_jornada):
         token = token.readline()
 
     logger.info(f"\n\n[CHECKING MATCHDAY] {code}\n\n") 
+
     request = requests.get(f"http://api.football-data.org/v2/competitions/{code}/matches",
                             params = {"matchday" : n_jornada, "status" : "SCHEDULED"},
                             headers = {"X-Auth-Token" : token}).json()
+    if len(request["matches"]) == 0:
+        request = requests.get(f"http://api.football-data.org/v2/competitions/{code}/matches",
+                                params = {"status" : "SCHEDULED"},
+                                headers = {"X-Auth-Token" : token}).json()
 
     return request
 

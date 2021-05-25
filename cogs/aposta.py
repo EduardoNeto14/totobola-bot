@@ -132,7 +132,7 @@ class Aposta(commands.Cog):
 
             ''' If there isn't an active bet, just return '''
             if bet is None:
-                await message.author.send(":pencil2: Tens que ativar a jornada antes de apostares!")
+                #await message.author.send(":pencil2: Tens que ativar a jornada antes de apostares!")
                 self.logger.warning(f"\n[on_message] {message.author.display_name} -> Não tem nenhuma aposta ativa!")
                 return
 
@@ -228,10 +228,12 @@ class Aposta(commands.Cog):
                         #TODO: enviar para canal#
                         await message.author.send(":fireworks: Aposta terminada!")
 
+                        '''
                         channel = database["totobola"]["properties"].find_one({}, {"_id" : 0, "channel" : 1})
                         channel = self.client.get_channel(channel["channel"])
-                        
-                        await self.show_bet(channel, message.author, jornada)
+                        '''
+
+                        await self.show_bet(message.author, message.author, jornada)
 
                     else:
                         database["totobola"][jornada["id_jornada"]].update({"player_id" : message.author.id, "apostas.id_jogo" : jornada["jogos"][position["index"]]["id_jogo"]},
@@ -359,6 +361,11 @@ class Aposta(commands.Cog):
                     for j, jogo in enumerate(bet["apostas"]):
                         if jogo["resultado"] is None:
                             pass
+                        
+                        elif database["totobola"]["jornadas"].find_one({"estado" : "ATIVA", "jogos" : {"$elemMatch" : {"id_jogo" : jogo["id_jogo"], "estado" : {"$ne" : "SCHEDULED"}}}}, {"_id" : 1}) is None:
+                            # meter check se é pm e se é ele mesmo
+                            pass
+                        
                         else:
                             games += f":soccer: `{jogo['id_jogo']}` **{jornada['jogos'][j]['homeTeam']} {jogo['resultado']} {jornada['jogos'][j]['awayTeam']}**\n\t\t\t:dart: **Pontuação:** `{jogo['pontuacao']}`"
                             
@@ -367,7 +374,10 @@ class Aposta(commands.Cog):
                             else:
                                 games += "\n\n"
                     
-                    embed.description = games
+                    if games == "":
+                        embed.description = ":lock: **Jogos ainda não começaram!\nNão há cá copianços, seus pulhas!**"
+                    else:
+                        embed.description = games
                 
                     return embed
                 else:

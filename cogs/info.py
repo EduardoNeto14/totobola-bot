@@ -466,11 +466,11 @@ class Info(commands.Cog):
 
         id_jogo = int(re.findall(r"\d+", id_jogo)[0])
         # Verifica se existe uma jornada ativa na competição
-        jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "jogos" : { "$elemMatch" : {"id_jogo" : id_jogo}}},
+        jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "jogos" : { "$elemMatch" : {"id_jogo" : id_jogo, "estado" : {"$ne" : "SCHEDULED"}}}},
                                                             {"_id" : 0, "id_jornada" : 1})
 
         if jornada is None:
-            await ctx.send("**O jogo que indicou não pertence a uma jornada ativa!**")
+            await ctx.send("**O jogo que indicou não pertence a uma jornada ativa ou o jogo ainda não iniciou!**")
             return
 
         res = "".join(res)
