@@ -236,7 +236,7 @@ class Info(commands.Cog):
             elif reaction.emoji == '⏩' and start < max - 1:
                 await self.pages(ctx=ctx, competicao=competicao, msg=msg, start=start+1, per_page=per_page, max=max)
 
-    @commands.command(brief = "**Mostra todos os vencedores das jornadas!** *por realizar*", description = "**Utilização:** `td!geraldes`")
+    @commands.command(brief = "**Mostra todos os vencedores das jornadas!**", description = "**Utilização:** `td!geraldes`")
     async def geraldes(self, ctx):
         database = pymongo.MongoClient(port = 27017)
         
@@ -307,7 +307,7 @@ class Info(commands.Cog):
         try:
             reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
         except asyncio.TimeoutError:
-            await msg.delete()
+            await msg.clear_reactions()
         
         else:
             # redirect on reaction
@@ -374,7 +374,7 @@ class Info(commands.Cog):
         try:
             reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
         except asyncio.TimeoutError:
-            await msg.delete()
+            await msg.clear_reactions()
         
         else:
             # redirect on reaction
@@ -439,7 +439,7 @@ class Info(commands.Cog):
         try:
             reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
         except asyncio.TimeoutError:
-            await msg.delete()
+            await msg.clear_reactions()
         
         else:
             # redirect on reaction

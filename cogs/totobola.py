@@ -186,7 +186,7 @@ class Totobola(commands.Cog):
         try:
             reaction, user = await self.client.wait_for("reaction_add", timeout = 120, check = check)
         except asyncio.TimeoutError:
-            pass
+            await msg.clear_reactions()
 
         else:
             if reaction is None:
@@ -247,7 +247,7 @@ class Totobola(commands.Cog):
         else:
             await ctx.send(":x: **Jogo não encontrado!**")
 
-    @commands.command(brief = "**Atribui prognóstico de um jogo!** (por realizar)", description = "**Utilização:** `td!prog [jogador] [id_jogo] [resultado]`")
+    @commands.command(brief = "**Atribui prognóstico de um jogo!**", description = "**Utilização:** `td!prog [jogador] [id_jogo] [resultado]`")
     @commands.check(is_admin)
     async def prog(self, ctx, player : discord.User, id_jogo, *resultado):
         # Verificar se player é uma menção
@@ -256,8 +256,6 @@ class Totobola(commands.Cog):
             database = pymongo.MongoClient(port = 27017)
 
             jornada = database["totobola"]["jornadas"].find_one( {"estado" : "ATIVA", "jogos.id_jogo" : int(id_jogo)}, {"_id" : 0, "id_jornada" : 1, "jogos.$" : 1})
-
-            print(jornada)
 
             new_result = "".join(resultado)
             tendency = None
@@ -279,8 +277,6 @@ class Totobola(commands.Cog):
             if jornada is not None:
                 curr_bet = database["totobola"][jornada["id_jornada"]].find_one( {"player_id" : ctx.message.mentions[0].id}, {"_id" : 0})
                 
-                # TODO
-
                 embed = discord.Embed(title = "Alteração de Resultado", colour = discord.Colour.dark_red())
                 embed.set_footer(text = "Totobola Discordiano", icon_url = logo)
                 embed.set_author(name = ctx.message.author.display_name, icon_url = ctx.message.author.avatar_url)
@@ -306,11 +302,6 @@ class Totobola(commands.Cog):
         
         else:
             await ctx.send(":x: Precisas de mencionar um jogador!")
-
-        # verificar se joker.processed = 0
-
-        # alterar o estado da aposta do jogador para ativa ou terminada dependendo do estado da mesma
-        pass
 
 def setup(client):
     client.add_cog(Totobola(client))

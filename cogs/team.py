@@ -90,7 +90,6 @@ class Team(commands.Cog):
     
     @commands.command(brief = "**Cria uma equipa!**", description = "**Utilização:** `td!team [nome] [jogador]`")
     async def team(self, ctx, name: str, member1 : discord.abc.User):
-        print(isinstance(member1, discord.abc.User))
         database = pymongo.MongoClient(port = 27017)
 
         if not isinstance(member1, discord.abc.User):
@@ -146,7 +145,6 @@ class Team(commands.Cog):
 
         data_to_send = ""
         for t, team in enumerate(teams):
-            print(team)
             if t + start*per_page < 3:
                 medals = [":first_place:", ":second_place:", ":third_place:"]
 
@@ -179,7 +177,7 @@ class Team(commands.Cog):
         try:
             reaction, user = await self.client.wait_for('reaction_add', timeout=120, check=check)
         except asyncio.TimeoutError:
-            await msg.delete()
+            await msg.clear_reactions()
         
         else:
             # redirect on reaction
